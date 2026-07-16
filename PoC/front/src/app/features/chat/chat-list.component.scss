@@ -192,3 +192,8 @@
         outline-offset: 2px;
     }
 }
+
+.chat-card--disabled {
+    cursor: default;
+    opacity: 0.7;
+}

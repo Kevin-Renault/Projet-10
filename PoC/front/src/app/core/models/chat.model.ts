@@ -5,6 +5,7 @@ export interface Chat {
     bookingId: number | null;
     createdBy: number;
     status: string;
+    assignedAgentId: number | null;
     createdAt: string;
     updatedAt: string;
 }

@@ -27,7 +27,8 @@
     </nav>
     <section class="chat-list" aria-label="Conversations agent">
         @for (chat of visibleAgentChats(); track chat.id) {
-        <article class="chat-card chat-card--interactive" role="button" tabindex="0"
+        <article class="chat-card chat-card--interactive" [class.chat-card--disabled]="isAssignedToAnotherAgent(chat)"
+            [attr.aria-disabled]="isAssignedToAnotherAgent(chat) ? 'true' : null" role="button" tabindex="0"
             (click)="activateAgentChat(chat, $event)" (keydown.enter)="activateAgentChat(chat, $event)"
             (keydown.space)="activateAgentChat(chat, $event)">
             <span class="chat-card__avatar" aria-hidden="true">{{ (chat.subject || 'C').charAt(0).toUpperCase()
@@ -40,7 +41,7 @@
             @if (chat.status === 'open' || chat.status === 'waiting_reassignment') {
             <button type="button" class="card-action"
                 (click)="claimChat(chat.id); $event.stopPropagation()">Prendre</button>
-            } @else if (chat.status === 'assigned') {
+            } @else if (isAssignedToCurrentAgent(chat)) {
             <button type="button" class="card-action"
                 (click)="releaseChat(chat.id); $event.stopPropagation()">Libérer</button>
             }

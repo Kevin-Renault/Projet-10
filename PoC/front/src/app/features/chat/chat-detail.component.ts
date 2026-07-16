@@ -51,6 +51,10 @@ export class ChatDetailComponent extends CommonComponent {
         this.chatEvents$.pipe(map(() => void 0))
     ).pipe(
         switchMap(() => this.chatDataSource.getById(this.chatId).pipe(
+            catchError(() => {
+                this.router.navigate(['/chats']);
+                return of(null);
+            }),
             finalize(() => this.loaded.set(true))
         ))
     ), { initialValue: null });
@@ -146,6 +150,26 @@ export class ChatDetailComponent extends CommonComponent {
                 this.location.back();
             }
         });
+    }
+
+    releaseChat(): void {
+        const currentChat = this.chat();
+        if (!this.isAgent || !currentChat
+            || currentChat.status !== 'assigned'
+            || currentChat.assignedAgentId !== this.currentUserId) {
+            return;
+        }
+
+        this.startSubmit();
+        this.chatDataSource.release(this.chatId).pipe(
+            catchError(error => {
+                this.error.set(true);
+                this.message.set('Erreur lors de la liberation de la conversation.');
+                return throwError(() => error);
+            }),
+            finalize(() => this.isLoading.set(false)),
+            take(1)
+        ).subscribe(() => this.router.navigate(['/chats']));
     }
 
     addParticipant(): void {

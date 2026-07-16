@@ -88,7 +88,7 @@ public class ChatService {
         return chatRepository.findAllByOrderByUpdatedAtDesc().stream()
                 .filter(chat -> chat.getStatus() == ChatStatus.open
                         || chat.getStatus() == ChatStatus.waiting_reassignment)
-                .filter(chat -> !participantRepository.existsByChatIdAndUserId(chat.getId(), principal.getId()))
+                .filter(chat -> !hasActiveParticipant(chat.getId(), principal.getId()))
                 .map(this::toDto)
                 .toList();
     }
@@ -122,11 +122,15 @@ public class ChatService {
         if (chat.getStatus() != ChatStatus.open && chat.getStatus() != ChatStatus.waiting_reassignment) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Chat is no longer open");
         }
-        boolean activeAgentParticipant = participantRepository.findByChatIdAndUserId(chatId, principal.getId())
-                .filter(participant -> participant.getLeftAt() == null && participant.getRole() == ChatRole.agent)
-                .isPresent();
-        if (!activeAgentParticipant) {
+        ChatParticipantEntity participant = participantRepository.findByChatIdAndUserId(chatId, principal.getId())
+                .orElse(null);
+        if (participant == null) {
             addParticipantInternal(chatId, principal.getId(), AGENT_ROLE);
+        } else if (participant.getRole() != ChatRole.agent) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User is not an agent participant");
+        } else {
+            participant.setLeftAt(null);
+            participantRepository.save(participant);
         }
         chat.setStatus(ChatStatus.assigned);
         chat.setUpdatedAt(Instant.now());
@@ -139,6 +143,9 @@ public class ChatService {
     public ChatDto release(YourWayUserEntity principal, Long chatId) {
         requireAgent(principal);
         ChatEntity chat = findChat(chatId);
+        if (chat.getStatus() != ChatStatus.assigned) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Chat is not assigned");
+        }
         ChatParticipantEntity participant = participantRepository.findByChatIdAndUserId(chatId, principal.getId())
                 .filter(item -> item.getLeftAt() == null && item.getRole() == ChatRole.agent)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
@@ -275,6 +282,12 @@ public class ChatService {
                 .isPresent();
     }
 
+    private boolean hasActiveParticipant(Long chatId, Long userId) {
+        return participantRepository.findByChatIdAndUserId(chatId, userId)
+                .filter(participant -> participant.getLeftAt() == null)
+                .isPresent();
+    }
+
     private static boolean isAgent(YourWayUserEntity user) {
         return AGENT_ROLE.equalsIgnoreCase(user.getUserRole());
     }
@@ -294,8 +307,15 @@ public class ChatService {
     }
 
     private ChatDto toDto(ChatEntity chat) {
+        Long assignedAgentId = participantRepository.findAllByChatId(chat.getId()).stream()
+                .filter(participant -> participant.getLeftAt() == null
+                        && participant.getRole() == ChatRole.agent)
+                .map(ChatParticipantEntity::getUserId)
+                .findFirst()
+                .orElse(null);
         return new ChatDto(chat.getId(), chat.getChatUuid(), chat.getSubject(), chat.getBookingId(),
-                chat.getCreatedBy(), chat.getStatus().name(), chat.getCreatedAt(), chat.getUpdatedAt());
+                chat.getCreatedBy(), chat.getStatus().name(), assignedAgentId,
+                chat.getCreatedAt(), chat.getUpdatedAt());
     }
 
     private ChatParticipantDto toDto(ChatParticipantEntity participant) {
