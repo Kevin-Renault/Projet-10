@@ -1,0 +1,10 @@
+<app-header></app-header>
+
+<main class="chat-create-page">
+    <button type="button" class="back-button" (click)="back()" aria-label="Retour aux conversations">&#8592;
+        Retour</button>
+    <app-dynamic-form [title]="'Nouvelle conversation'" [formElements]="chatFormElements"
+        [submitLabel]="'Créer le chat'" [error]="error()" [isLoading]="isLoading()" [message]="message()"
+        (formSubmit)="onFormSubmit($event)">
+    </app-dynamic-form>
+</main>

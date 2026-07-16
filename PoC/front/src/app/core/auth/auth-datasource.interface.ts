@@ -1,0 +1,21 @@
+import { InjectionToken, Signal } from '@angular/core';
+import { Observable } from 'rxjs';
+import { User } from '../models/user.model';
+
+export interface AuthResponse {
+    token: string;
+    user: User;
+}
+export const AUTH_DATASOURCE = new InjectionToken<AuthDataSource>('AuthDataSource');
+export interface AuthDataSource {
+    initSession(): Promise<void>;
+    refresh(): Observable<void>;
+    login(email: string, password: string): Observable<void>;
+    register(data: User): Observable<AuthResponse>;
+    logout(): void;
+    clearSession(): void;
+    isAuthenticated$(): Signal<boolean>;
+    getCurrentUser(): User;
+    refreshCurrentUser(): Observable<User>;
+    getCurrentUserId(): Observable<number | null>
+}

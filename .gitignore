@@ -1,0 +1,32 @@
+.venv/
+
+# IDE and local tooling
+.vscode/*.log
+.workspace_tools/
+
+# Angular and Node build/dependency outputs
+PoC/front/node_modules/
+PoC/front/.angular/
+PoC/front/dist/
+PoC/front/coverage/
+PoC/front/coverage-e2e/
+PoC/front/front-coverage/
+PoC/front/.nyc_output/
+PoC/front/cypress/screenshots/
+PoC/front/cypress/videos/
+PoC/front/jest-results.json
+
+# Maven build outputs
+PoC/back/target/
+
+# Local environment and secrets
+PoC/**/.env
+PoC/**/.env.*
+!PoC/**/.env.example
+PoC/**/application-local.properties
+
+# Logs and OS files
+*.log
+*.tmp
+Thumbs.db
+Desktop.ini

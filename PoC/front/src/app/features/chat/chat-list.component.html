@@ -1,0 +1,78 @@
+<app-header></app-header>
+
+@if (isPageLoading()) {
+<output class="spinner-container" aria-live="polite" aria-busy="true">
+    <span class="page-spinner" aria-hidden="true"></span>
+</output>
+} @else {
+<section class="chat-toolbar">
+    <div>
+        <h1>{{ isAgent ? 'Pilotage des conversations' : 'Mes conversations' }}</h1>
+        <p>{{ isAgent ? agentChats().length : chatsSorted().length }} conversation{{ (isAgent ? agentChats().length :
+            chatsSorted().length) === 1 ? '' : 's' }}</p>
+    </div>
+    @if (!isAgent) { <button type="button" class="primary-action" (click)="createChat()">Nouveau chat</button> }
+</section>
+
+@if (isAgent) {
+<section class="agent-dashboard" aria-label="Pilotage des conversations">
+    <nav class="agent-filters" aria-label="Filtrer les conversations">
+        @for (filter of ['all', 'closed', 'mine', 'waiting', 'assigned']; track filter) {
+        <button type="button" [class.is-active]="agentFilter() === filter" (click)="setAgentFilter($any(filter))">
+            {{ filter === 'all' ? 'Tous' : filter === 'closed' ? 'Clôturées' : filter === 'mine' ? 'Mes chats' :
+            filter === 'waiting' ? 'En attente' : 'Attribués' }}
+            <span>{{ agentCount($any(filter)) }}</span>
+        </button>
+        }
+    </nav>
+    <section class="chat-list" aria-label="Conversations agent">
+        @for (chat of visibleAgentChats(); track chat.id) {
+        <article class="chat-card chat-card--interactive" role="button" tabindex="0"
+            (click)="activateAgentChat(chat, $event)" (keydown.enter)="activateAgentChat(chat, $event)"
+            (keydown.space)="activateAgentChat(chat, $event)">
+            <span class="chat-card__avatar" aria-hidden="true">{{ (chat.subject || 'C').charAt(0).toUpperCase()
+                }}</span>
+            <span class="chat-card__body">
+                <span class="chat-card__topline"><strong>{{ chat.subject || 'Demande sans objet' }}</strong><time
+                        [dateTime]="chat.updatedAt">{{ chat.updatedAt | date:'dd/MM/yyyy HH:mm' }}</time></span>
+                <span class="chat-card__meta">Conversation #{{ chat.id }} · {{ statusLabel(chat.status) }}</span>
+            </span>
+            @if (chat.status === 'open' || chat.status === 'waiting_reassignment') {
+            <button type="button" class="card-action"
+                (click)="claimChat(chat.id); $event.stopPropagation()">Prendre</button>
+            } @else if (chat.status === 'assigned') {
+            <button type="button" class="card-action"
+                (click)="releaseChat(chat.id); $event.stopPropagation()">Libérer</button>
+            }
+        </article>
+        }
+    </section>
+</section>
+}
+
+@if (!isAgent) {
+@if (chatsSorted().length === 0) {
+<section class="empty-state">
+    <h2>Aucune conversation</h2>
+    <p>Créez un chat pour commencer un échange.</p>
+    <button type="button" class="primary-action" (click)="createChat()">Créer une conversation</button>
+</section>
+} @else {
+<section class="chat-list" aria-label="Liste des conversations">
+    @for (chat of chatsSorted(); track chat.id) {
+    <button type="button" class="chat-card" (click)="openChat(chat.id)">
+        <span class="chat-card__avatar" aria-hidden="true">{{ (chat.subject || 'C').charAt(0).toUpperCase() }}</span>
+        <span class="chat-card__body">
+            <span class="chat-card__topline">
+                <strong>{{ chat.subject || 'Conversation sans objet' }}</strong>
+                <time [dateTime]="chat.updatedAt">{{ chat.updatedAt | date:'dd/MM/yyyy HH:mm' }}</time>
+            </span>
+            <span class="chat-card__meta">Conversation #{{ chat.id }} · {{ chat.status }}</span>
+        </span>
+        <span class="chat-card__arrow" aria-hidden="true">&#8594;</span>
+    </button>
+    }
+</section>
+}
+}
+}

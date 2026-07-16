@@ -1,0 +1,28 @@
+import { Injectable } from '@angular/core';
+
+@Injectable({ providedIn: 'root' })
+export class CsrfTokenService {
+    private token?: string;
+
+    set(token: string | null | undefined): void {
+        if (token && token.trim().length > 0) {
+            this.token = token;
+        }
+    }
+
+    setToken(token: string | null | undefined): void {
+        this.set(token);
+    }
+
+    get(): string | undefined {
+        return this.token;
+    }
+
+    getToken(): string | null {
+        return this.token ?? null;
+    }
+
+    clear(): void {
+        this.token = undefined;
+    }
+}

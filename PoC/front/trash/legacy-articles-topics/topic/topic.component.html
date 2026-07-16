@@ -1,0 +1,32 @@
+<app-header></app-header>
+@if (isPageLoading()) {
+<output class="spinner-container" aria-live="polite" aria-busy="true">
+    <span class="page-spinner" aria-hidden="true"></span>
+</output>
+}
+@else
+{
+<section class="topics-list">
+    @if (topics(); as topics) {
+    @for (topic of topics; track topic.id) {
+    <article class="topic-card">
+        <header class="topic-title">{{ topic.name }}</header>
+        <section class="topic-content">
+            {{ topic.description | slice:0:220 }}
+            @if (topic.description && topic.description.length > 220) {
+            <span>...</span>
+            }
+        </section>
+        <button mat-raised-button color="primary" (click)="toggleTopicSubscription(topic.id)">
+            @if (isSubscribed(topic.id)) {
+            <span>se désabonner</span>
+            }
+            @else {
+            <span>s'abonner</span>
+            }
+        </button>
+    </article>
+    }
+    }
+</section>
+}

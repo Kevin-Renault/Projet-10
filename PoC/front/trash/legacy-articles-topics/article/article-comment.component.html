@@ -1,0 +1,39 @@
+<app-header></app-header>
+@if (isPageLoading()) {
+<output class="spinner-container" aria-live="polite" aria-busy="true">
+    <span class="page-spinner" aria-hidden="true"></span>
+</output>
+}
+@else {
+<article class="article-card">
+    <button mat-icon-button (click)="back()" class="back-button" aria-label="Retour">
+        <mat-icon>arrow_back</mat-icon>
+    </button>
+    @if (article(); as article) {
+    <header class="article-title">{{ article.title }}</header>
+    <section class="article-meta">
+        <span class="article-date">{{ article.createdAt | date:'dd/MM/yyyy' }}</span>
+        <span class="article-author">{{ authorById(article.authorId) | async }}</span>
+        <span class="article-topic">{{ topicById(article.topicId) | async }}</span>
+    </section>
+    <section class="article-content">
+        {{ article.content }}
+    </section>
+    }
+</article>
+<hr>
+<section aria-label="Commentaires">
+    <h2>Commentaires :</h2>
+    <section class="comments-list">
+        @for (comment of articleComments(); track comment.id) {
+        <header class="comment-author">{{ authorById(comment.authorId) | async }}</header>
+        <article class="comment-card">
+            <section class="comment-content">{{ comment.content }}</section>
+        </article>
+        }
+    </section>
+</section>
+<app-dynamic-form [formElements]="commentFormElements" [submitLabel]="'Sauvegarder'" [error]="error()"
+    [isLoading]="isLoading()" [message]="message()" (formSubmit)="onFormSubmit($event)">
+</app-dynamic-form>
+}

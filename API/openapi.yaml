@@ -1,0 +1,146 @@
+openapi: 3.0.3
+info:
+  title: YourCarYourWay - Minimal API
+  version: '1.0.0'
+servers:
+  - url: https://api.yourcaryourway.example.com
+paths:
+  /api/users/register:
+    post:
+      summary: Create a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegister'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+  /api/reservations:
+    post:
+      summary: Create reservation
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReservationCreate'
+      responses:
+        '201':
+          description: Reservation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reservation'
+  /auth/refresh:
+    post:
+      summary: Refresh access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: New tokens
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                  refreshToken:
+                    type: string
+  /webhooks/payments:
+    post:
+      summary: Payment provider webhook (ex: Stripe)
+      description: Receives payment events. Payload includes `event_id` for idempotency.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentWebhook'
+      responses:
+        '200':
+          description: OK
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    UserRegister:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+    ReservationCreate:
+      type: object
+      required: [vehicleId, startDate, endDate]
+      properties:
+        vehicleId:
+          type: string
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        pickupAgencyId:
+          type: string
+        returnAgencyId:
+          type: string
+    Reservation:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+        totalPrice:
+          type: number
+          format: float
+        currency:
+          type: string
+    PaymentWebhook:
+      type: object
+      required: [event_id, type, data]
+      properties:
+        event_id:
+          type: string
+        type:
+          type: string
+        created:
+          type: integer
+        data:
+          type: object
+  

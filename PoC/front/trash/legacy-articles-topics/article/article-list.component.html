@@ -1,0 +1,42 @@
+<app-header></app-header>
+@if (isPageLoading()) {
+<output class="spinner-container" aria-live="polite" aria-busy="true">
+    <span class="page-spinner" aria-hidden="true"></span>
+</output>
+}
+@else
+{
+<nav class="card-toolbar">
+    <button mat-raised-button color="primary" (click)="createArticle()">Créer un article</button>
+    <section>
+        Trier
+        <button class="sort-btn" type="button" (click)="toggleSortOrder()">
+            @if (sortOrder() === 'desc') {
+            <span>&#8595;</span>
+            }
+            @if (sortOrder() === 'asc') {
+            <span>&#8593;</span>
+            }
+        </button>
+    </section>
+</nav>
+
+<section class="list-grid">
+    @for (article of articlesSorted(); track $index) {
+    <a class="card" (click)="openArticleComments(article.id)" (keydown.enter)="openArticleComments(article.id)"
+        (keydown.space)="openArticleComments(article.id)" tabindex="0" role="link">
+        <header class="card-title">{{ article.title }}</header>
+        <section class="card-meta">
+            <span class="card-date">{{ article.createdAt | date:'dd/MM/yyyy' }}</span>
+            <span class="card-author">{{ authorById(article.authorId) }}</span>
+        </section>
+        <section class="card-content">
+            {{ article.content | slice:0:220 }}
+            @if (article.content.length > 220) {
+            <span>...</span>
+            }
+        </section>
+    </a>
+    }
+</section>
+}

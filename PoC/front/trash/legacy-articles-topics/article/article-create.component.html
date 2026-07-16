@@ -1,0 +1,14 @@
+<app-header></app-header>
+<button mat-icon-button (click)="back()" class="back-button" aria-label="Retour">
+    <mat-icon>arrow_back</mat-icon>
+</button>
+@if (isPageLoading()) {
+<output class="spinner-container" aria-live="polite" aria-busy="true">
+    <span class="page-spinner" aria-hidden="true"></span>
+</output>
+}
+@else {
+<app-dynamic-form [title]="'Créer un nouvel article'" [formElements]="articleFormElements()" [submitLabel]="'Créer'"
+    [error]="error()" [isLoading]="isLoading()" [message]="message()" (formSubmit)="onFormSubmit($event)">
+</app-dynamic-form>
+}

@@ -1,0 +1,20 @@
+<header class="header">
+    <figure class="header__logo">
+        <img src="/assets/logo_ycyw.png" alt="Logo" loading="lazy" />
+    </figure>
+    <nav class="header__nav">
+        <app-header-buttons [buttons]="buttons" [onButtonClick]="onButtonClick.bind(this)">
+        </app-header-buttons>
+    </nav>
+    <button class="header__menu" aria-label="Menu" (click)="toggleMenu()">
+        <span></span><span></span><span></span>
+    </button>
+    @if (menuOpen) {
+    <aside class="header__drawer-overlay">
+        <section class="header__drawer-content">
+            <app-header-buttons [buttons]="buttons" [onButtonClick]="onButtonClick.bind(this)">
+            </app-header-buttons>
+        </section>
+    </aside>
+    }
+</header>

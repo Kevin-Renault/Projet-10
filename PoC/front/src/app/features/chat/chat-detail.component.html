@@ -1,0 +1,90 @@
+<app-header></app-header>
+
+@if (isPageLoading()) {
+<output class="spinner-container" aria-live="polite" aria-busy="true">
+    <span class="page-spinner" aria-hidden="true"></span>
+</output>
+} @else if (chat(); as currentChat) {
+<main class="chat-page">
+    <header class="chat-header">
+        <button type="button" class="back-button" (click)="back()"
+            aria-label="Retour aux conversations">&#8592;</button>
+        <div>
+            <h1>{{ currentChat.subject || 'Conversation sans objet' }}</h1>
+            <p>Conversation #{{ currentChat.id }} · {{ currentChat.status === 'closed' ? 'Clôturée' : currentChat.status
+                }}</p>
+        </div>
+        @if (!isAgent && currentChat.status !== 'closed') {
+        <button type="button" class="close-chat-button" (click)="closeChat()">Clôturer</button>
+        }
+    </header>
+
+    <section class="chat-layout">
+        <section class="message-panel" aria-label="Messages">
+            <section class="messages" aria-live="polite">
+                @for (chatMessage of messages(); track chatMessage.id) {
+                <article class="message" [class.message--mine]="isMine(chatMessage)"
+                    [class.message--other]="!isMine(chatMessage)">
+                    <span class="message__author">
+                        {{ isMine(chatMessage) ? 'Vous' : (userName(chatMessage.senderId) | async) }}
+                    </span>
+                    <span class="message__bubble">{{ chatMessage.content }}</span>
+                    <time class="message__date" [dateTime]="chatMessage.createdAt">
+                        {{ chatMessage.createdAt | date:'dd/MM/yyyy HH:mm' }}
+                    </time>
+                </article>
+                } @empty {
+                <p class="status">Aucun message dans cette conversation.</p>
+                }
+            </section>
+
+            @if (currentChat.status !== 'closed') {
+            <form class="message-form" (ngSubmit)="sendMessage()">
+                <textarea name="message" [ngModel]="messageContent()" (ngModelChange)="messageContent.set($event)"
+                    placeholder="Ecrire un message..." maxlength="10000" required aria-label="Message"></textarea>
+                <button class="primary-action" type="submit"
+                    [disabled]="isLoading() || !messageContent().trim()">Envoyer</button>
+            </form>
+            } @else {
+            <p class="status">Cette conversation est clôturée.</p>
+            }
+            @if (message()) {
+            <p class="status" [class.error]="error()">{{ message() }}</p>
+            }
+        </section>
+
+        <aside class="participants" aria-label="Participants">
+            <h2>Participants</h2>
+            <ul>
+                @for (participant of participants(); track participant.id) {
+                <li class="participant">
+                    <span>{{ userName(participant.userId) | async }}</span>
+                    <small>{{ participant.role }}</small>
+                </li>
+                }
+            </ul>
+            @if (isAgent && availableUsers().length > 0) {
+            <div class="add-participant">
+                <select [ngModel]="selectedParticipantId()"
+                    (ngModelChange)="selectedParticipantId.set($event ? +$event : null)" name="participant"
+                    aria-label="Nouveau participant">
+                    <option [ngValue]="null">Ajouter un participant</option>
+                    @for (user of availableUsers(); track user.id) {
+                    <option [ngValue]="user.id">{{ user.username }}</option>
+                    }
+                </select>
+                <button type="button" class="primary-action" (click)="addParticipant()"
+                    [disabled]="!selectedParticipantId() || isLoading()">
+                    Ajouter
+                </button>
+            </div>
+            }
+        </aside>
+    </section>
+</main>
+} @else {
+<section class="empty-state">
+    <h1>Conversation introuvable</h1>
+    <button type="button" class="primary-action" (click)="back()">Retour aux conversations</button>
+</section>
+}

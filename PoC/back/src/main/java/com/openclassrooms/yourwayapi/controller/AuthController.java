@@ -1,0 +1,253 @@
+package com.openclassrooms.yourwayapi.controller;
+
+import com.openclassrooms.yourwayapi.dto.UserDto;
+import com.openclassrooms.yourwayapi.dto.auth.AuthResponseDto;
+import com.openclassrooms.yourwayapi.dto.auth.LoginRequest;
+import com.openclassrooms.yourwayapi.dto.auth.RegisterRequest;
+import com.openclassrooms.yourwayapi.entity.YourWayUserEntity;
+import com.openclassrooms.yourwayapi.exception.ApiErrorResponse;
+import com.openclassrooms.yourwayapi.security.JwtCookieService;
+import com.openclassrooms.yourwayapi.security.RefreshTokenService;
+import com.openclassrooms.yourwayapi.service.AuthService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.util.UUID;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import com.openclassrooms.yourwayapi.ApiEndpoints;
+
+@RestController
+@RequestMapping(ApiEndpoints.AUTH_BASE)
+@Tag(name = "Authentication", description = "Register, login, logout and retrieve the current user.")
+public class AuthController {
+
+    private static final String CSRF_HEADER_NAME = "X-XSRF-TOKEN";
+
+    private final AuthService authService;
+    private final JwtCookieService cookieService;
+    private final RefreshTokenService refreshTokenService;
+
+    public AuthController(AuthService authService, JwtCookieService cookieService,
+            RefreshTokenService refreshTokenService) {
+        this.authService = authService;
+        this.cookieService = cookieService;
+        this.refreshTokenService = refreshTokenService;
+    }
+
+    @GetMapping("/csrf")
+    @Operation(summary = "Get CSRF token", description = "For browser clients: ensures the XSRF-TOKEN cookie is set so unsafe requests can include the X-XSRF-TOKEN header.", responses = {
+            @ApiResponse(responseCode = "204", description = "CSRF token cookie set", content = @Content)
+    })
+    public ResponseEntity<Void> csrf(CsrfToken csrfToken) {
+        // Spring Security may defer CSRF token generation until it's actually accessed.
+        // Touch it here to force CookieCsrfTokenRepository to emit the XSRF-TOKEN
+        // cookie.
+        String token = csrfToken.getToken();
+
+        // Expose the token for clients that cannot read the cookie (e.g. HttpOnly).
+        return ResponseEntity.noContent()
+                .header(CSRF_HEADER_NAME, token)
+                .build();
+    }
+
+    @PostMapping("/register")
+    @Operation(summary = "Register a new user", description = "Creates a new user account and sets access, refresh, and XSRF-TOKEN cookies in the response.", responses = {
+            @ApiResponse(responseCode = "200", description = "User registered and authenticated", content = @Content(schema = @Schema(implementation = AuthResponseDto.class))),
+            @ApiResponse(responseCode = "400", description = "Validation error", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "409", description = "Conflict (e.g. email already exists)", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    })
+    public ResponseEntity<AuthResponseDto> register(
+            @Valid @RequestBody RegisterRequest request,
+            HttpServletRequest httpRequest) {
+        AuthResponseDto response = authService.register(request);
+        String refreshToken = refreshTokenService.issueAndReplaceForUser(response.user().id());
+        ResponseCookie accessCookie = cookieService.createAccessTokenCookie(response.token());
+        ResponseCookie refreshCookie = cookieService.createRefreshTokenCookie(refreshToken);
+        String token = extractXsrfTokenValue(httpRequest);
+        ResponseCookie xsrfCookie = createXsrfTokenCookie(token);
+
+        ResponseEntity.BodyBuilder builder = ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, accessCookie.toString())
+                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+                .header(HttpHeaders.SET_COOKIE, xsrfCookie.toString());
+
+        if (token != null && !token.isBlank()) {
+            builder.header(CSRF_HEADER_NAME, token);
+        }
+        return builder.body(response);
+    }
+
+    @PostMapping("/login")
+    @Operation(summary = "Login", description = "Authenticates a user and sets an access token cookie in the response.", responses = {
+            @ApiResponse(responseCode = "200", description = "Authenticated", content = @Content(schema = @Schema(implementation = AuthResponseDto.class))),
+            @ApiResponse(responseCode = "400", description = "Validation error", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Invalid credentials", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    })
+    public ResponseEntity<AuthResponseDto> login(@Valid @RequestBody LoginRequest request) {
+        return login(request, null);
+    }
+
+    public ResponseEntity<AuthResponseDto> login(
+            @Valid @RequestBody LoginRequest request,
+            HttpServletRequest httpRequest) {
+        AuthResponseDto response = authService.login(request);
+        String refreshToken = refreshTokenService.issueAndReplaceForUser(response.user().id());
+        ResponseCookie accessCookie = cookieService.createAccessTokenCookie(response.token());
+        ResponseCookie refreshCookie = cookieService.createRefreshTokenCookie(refreshToken);
+        String token = extractXsrfTokenValue(httpRequest);
+        ResponseCookie xsrfCookie = createXsrfTokenCookie(token);
+
+        ResponseEntity.BodyBuilder builder = ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, accessCookie.toString())
+                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+                .header(HttpHeaders.SET_COOKIE, xsrfCookie.toString());
+
+        if (token != null && !token.isBlank()) {
+            builder.header(CSRF_HEADER_NAME, token);
+        }
+
+        return builder.body(response);
+    }
+
+    @PostMapping("/refresh")
+    @Operation(summary = "Refresh access token", description = "Uses the refresh token cookie to rotate the session and set a new access token cookie.", responses = {
+            @ApiResponse(responseCode = "200", description = "Access token refreshed", content = @Content(schema = @Schema(implementation = AuthResponseDto.class))),
+            @ApiResponse(responseCode = "401", description = "Invalid or expired refresh token", content = @Content),
+            @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    })
+    public ResponseEntity<AuthResponseDto> refresh(HttpServletRequest request) {
+        String presented = extractCookieValue(request, cookieService.getRefreshCookieName());
+        RefreshTokenService.RefreshRotationResult rotation = refreshTokenService.rotate(presented);
+
+        AuthResponseDto response = authService.refreshAccessToken(rotation.userId());
+
+        ResponseCookie accessCookie = cookieService.createAccessTokenCookie(response.token());
+        ResponseCookie refreshCookie = cookieService.createRefreshTokenCookie(rotation.newRefreshToken());
+        String token = extractXsrfTokenValue(request);
+        ResponseCookie xsrfCookie = createXsrfTokenCookie(token);
+
+        ResponseEntity.BodyBuilder builder = ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, accessCookie.toString())
+                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+                .header(HttpHeaders.SET_COOKIE, xsrfCookie.toString());
+
+        if (token != null && !token.isBlank()) {
+            builder.header(CSRF_HEADER_NAME, token);
+        }
+
+        return builder.body(response);
+    }
+
+    @PostMapping("/logout")
+    @Operation(summary = "Logout", description = "Clears access + refresh token cookies and revokes the refresh token.", responses = {
+            @ApiResponse(responseCode = "204", description = "Logged out (cookie cleared)", content = @Content),
+            @ApiResponse(responseCode = "401", description = "Not authenticated", content = @Content),
+            @ApiResponse(responseCode = "403", description = "Forbidden", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    })
+    @SecurityRequirement(name = com.openclassrooms.yourwayapi.config.OpenApiConfig.BEARER_AUTH_SCHEME)
+    @SecurityRequirement(name = com.openclassrooms.yourwayapi.config.OpenApiConfig.COOKIE_AUTH_SCHEME)
+    public ResponseEntity<Void> logout(
+            HttpServletRequest request,
+            @Parameter(hidden = true) @AuthenticationPrincipal Object principal) {
+
+        if (principal instanceof YourWayUserEntity user) {
+            refreshTokenService.revokeForUser(user.getId());
+        } else {
+            // Access token may be expired; still revoke based on refresh cookie when
+            // present.
+            String presented = extractCookieValue(request, cookieService.getRefreshCookieName());
+            refreshTokenService.revokePresentedToken(presented);
+        }
+
+        ResponseCookie accessCookie = cookieService.clearAccessTokenCookie();
+        ResponseCookie refreshCookie = cookieService.clearRefreshTokenCookie();
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, accessCookie.toString())
+                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+                .build();
+    }
+
+    @GetMapping("/me")
+    @Operation(summary = "Get current user", description = "Returns the currently authenticated user. Authentication is done via the access token cookie.", responses = {
+            @ApiResponse(responseCode = "200", description = "Current user", content = @Content(schema = @Schema(implementation = UserDto.class))),
+            @ApiResponse(responseCode = "401", description = "Not authenticated", content = @Content),
+            @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    })
+    @SecurityRequirement(name = com.openclassrooms.yourwayapi.config.OpenApiConfig.BEARER_AUTH_SCHEME)
+    @SecurityRequirement(name = com.openclassrooms.yourwayapi.config.OpenApiConfig.COOKIE_AUTH_SCHEME)
+    public ResponseEntity<UserDto> me(@Parameter(hidden = true) @AuthenticationPrincipal Object principal) {
+        if (principal instanceof YourWayUserEntity user) {
+            return ResponseEntity.ok(authService.toUserDto(user));
+        }
+        return ResponseEntity.status(HttpServletResponse.SC_UNAUTHORIZED).build();
+    }
+
+    private String extractCookieValue(HttpServletRequest request, String cookieName) {
+        if (cookieName == null || cookieName.isBlank()) {
+            return null;
+        }
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null) {
+            return null;
+        }
+        for (Cookie cookie : cookies) {
+            if (cookieName.equals(cookie.getName())) {
+                return cookie.getValue();
+            }
+        }
+        return null;
+    }
+
+    private ResponseCookie createXsrfTokenCookie(String token) {
+        String value = (token == null) ? "" : token;
+        return ResponseCookie.from("XSRF-TOKEN", value)
+                .httpOnly(true)
+                .secure(cookieService.isCookieSecure())
+                .path("/")
+                .sameSite(cookieService.getSameSite())
+                .build();
+    }
+
+    private String extractXsrfTokenValue(HttpServletRequest request) {
+        if (request == null) {
+            return UUID.randomUUID().toString();
+        }
+
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null) {
+            return UUID.randomUUID().toString();
+        }
+
+        for (Cookie cookie : cookies) {
+            if (cookie != null && "XSRF-TOKEN".equals(cookie.getName())) {
+                String value = cookie.getValue();
+                if (value != null && !value.isBlank()) {
+                    return value;
+                }
+            }
+        }
+
+        return UUID.randomUUID().toString();
+    }
+
+}

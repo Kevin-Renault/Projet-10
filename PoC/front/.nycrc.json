@@ -1,0 +1,18 @@
+{
+    "extends": "@istanbuljs/nyc-config-typescript",
+    "all": true,
+    "exclude": [
+        "./coverage/**",
+        "cypress/**",
+        "./dist/**",
+        "./src/app/features/header-test.component.ts",
+        "./src/src/app/core/models/**",
+        "**/*.model.ts*",
+        "**/*mock.service.ts",
+        "**/*.spec.ts",
+        "**/*main.ts",
+        "**/*test.ts",
+        "**/*jest.ts",
+        "**/*.conf.js"
+    ]
+}

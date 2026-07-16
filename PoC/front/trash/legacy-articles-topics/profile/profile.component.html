@@ -1,0 +1,24 @@
+<app-header></app-header>
+
+<app-dynamic-form [title]="'Profil Utilisateur'" [formElements]="profileFormElements" [submitLabel]="'Sauvegarder'"
+    [error]="error()" [isLoading]="isLoading()" [message]="message()" (formSubmit)="onFormSubmit($event)">
+</app-dynamic-form>
+
+<section class="topics-list">
+    @if (myTopics() ; as topics) {
+    @for (topic of topics; track topic.id) {
+    <article class="topic-card">
+        <header class="topic-title">{{ topic.name }}</header>
+        <section class="topic-content">
+            {{ topic.description | slice:0:220 }}
+            @if (topic.description && topic.description.length > 220) {
+            <span>...</span>
+            }
+        </section>
+        <button mat-raised-button color="primary" (click)="toggleTopicSubscription(topic.id)">
+            <span>se désabonner</span>
+        </button>
+    </article>
+    }
+    }
+</section>
