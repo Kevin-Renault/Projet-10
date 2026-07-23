@@ -1,44 +1,48 @@
 # PoC tchat - Your Car Your Way
 
-Cette PoC demontre la faisabilite de l'option B de la mission : un tchat entre un client et un agent. Elle est volontairement limitee au parcours tchat et ne constitue pas l'application complete de reservation.
+Cette preuve de concept démontre le parcours d'un tchat entre un client et un agent. Elle couvre uniquement la fonctionnalité de tchat et ne constitue pas l'application complète de réservation.
 
-## Ce qui est demontre
+## Périmètre de la PoC
 
-- creation et consultation d'une conversation ;
-- envoi et persistance des messages dans PostgreSQL ;
-- roles client et agent ;
-- prise en charge et liberation d'une conversation par un agent ;
-- affichage des conversations en attente, attribuees et cloturees ;
-- cloture d'une conversation par le client ;
-- blocage de l'envoi apres cloture ;
-- mise a jour temps reel avec Server-Sent Events (SSE) ;
-- authentification JWT en cookies HttpOnly ;
-- rotation et revocation des refresh tokens ;
-- protection CSRF des requetes modifiantes ;
-- controle des droits cote backend.
+La PoC permet de :
 
-## Technologies
+- créer et consulter une conversation ;
+- lire et enregistrer des messages dans PostgreSQL ;
+- authentifier un client ou un agent ;
+- prendre en charge une conversation en attente ;
+- libérer une conversation attribuée ;
+- afficher les conversations en attente, attribuées ou clôturées ;
+- recevoir les nouveaux messages et changements d'état par SSE ;
+- clôturer une conversation côté client ;
+- bloquer l'envoi de messages après clôture ;
+- contrôler les droits d'accès côté backend.
+
+La PoC ne comprend pas le parcours de réservation, le paiement, la gestion complète des véhicules, Redis, RabbitMQ, Kubernetes ou une supervision de production.
+
+## Technologies utilisées
 
 | Composant | Technologie |
 | --- | --- |
-| Frontend | Angular 21.2, TypeScript, RxJS |
+| Frontend | Angular 21, TypeScript, RxJS |
 | Backend | Java 21, Spring Boot 3.2, Spring MVC |
-| Persistance | PostgreSQL, Spring Data JPA/Hibernate |
-| Securite | Spring Security, JWT, cookies HttpOnly, CSRF |
-| Temps reel | SSE avec `SseEmitter` et `EventSource` |
-| Tests frontend | Jest, Karma/Jasmine, Cypress |
-| Tests backend | JUnit, Spring Boot Test, Mockito |
+| Base de données | PostgreSQL 13 ou plus récent |
+| Persistance | Spring Data JPA et Hibernate |
+| Authentification | Spring Security, JWT et cookies HttpOnly |
+| Protection des requêtes | CSRF avec cookie et header `X-XSRF-TOKEN` |
+| Temps réel | Server-Sent Events avec `SseEmitter` et `EventSource` |
+| Tests frontend | Jest, Karma/Jasmine et Cypress |
+| Tests backend | JUnit, Spring Boot Test et Mockito |
 
-## Prerequis
+## Prérequis
 
-Installer les outils suivants :
+Installer :
 
 - Java 21 ;
 - Node.js et npm ;
-- PostgreSQL 13 ou une version plus recente ;
-- Git, si le projet est clone depuis GitHub.
+- PostgreSQL 13 ou plus récent ;
+- Git.
 
-Verifier les versions :
+Vérifier les installations :
 
 ```powershell
 java -version
@@ -47,31 +51,30 @@ npm --version
 psql --version
 ```
 
-## Recuperer le projet
+Le backend attend PostgreSQL sur `localhost:5432`. L'utilisateur PostgreSQL doit pouvoir se connecter à la base et, lors de la première installation, créer l'extension `pgcrypto`.
+
+## Récupérer le projet
 
 ```powershell
 git clone https://github.com/Kevin-Renault/Projet-10.git
 Set-Location Projet-10\PoC
 ```
 
-## Configurer PostgreSQL
+Si le dépôt est déjà présent, se placer directement dans le dossier `PoC`.
 
-Creer une base vide, par exemple `ycyw_poc` :
+## Initialiser PostgreSQL
+
+Créer une base vide :
 
 ```powershell
 createdb -U postgres ycyw_poc
 ```
 
-Le backend lit les variables suivantes :
+Le backend lit sa configuration dans les variables d'environnement. Elles doivent être définies avant son démarrage, dans le même environnement que celui qui exécute Maven.
 
-| Variable | Exemple | Role |
-| --- | --- | --- |
-| `DB_YCYW_NAME` | `ycyw_poc` | Nom de la base |
-| `DB_USER` | `postgres` | Utilisateur PostgreSQL |
-| `DB_PASSWORD` | `mot-de-passe-local` | Mot de passe PostgreSQL |
-| `JWT_SECRET` | chaine d'au moins 32 caracteres | Signature des JWT |
+### Développement local uniquement
 
-Definir ces variables dans le terminal qui lancera le backend. Ne pas les committer dans Git.
+Pour un test local rapide, définir les variables dans le terminal PowerShell qui lancera le backend :
 
 ```powershell
 $env:DB_YCYW_NAME = "ycyw_poc"
@@ -80,36 +83,92 @@ $env:DB_PASSWORD = "mot-de-passe-local"
 $env:JWT_SECRET = "cle-locale-de-developpement-d-au-moins-32-caracteres"
 ```
 
-Au demarrage, Spring execute les scripts SQL de `back/src/main/resources` dans l'ordre. Ils creent le schema et les comptes de demonstration. Pour appliquer le schema manuellement, voir [Livrables/Database/INSTALL.md](../Livrables/Database/INSTALL.md).
+Cette méthode est pratique pour le développement local : les variables restent disponibles uniquement dans ce terminal et les processus lancés depuis celui-ci. Elles disparaissent lorsque le terminal est fermé. Ne pas utiliser de mots de passe ou de secrets réels dans ce fichier ou dans un script versionné.
 
-## Demarrer le backend
+### Environnement persistant hors développement local
 
-Depuis un terminal PowerShell, avec les variables precedentes definies :
+Pour une installation persistante sur Windows, définir les variables d'environnement au niveau du système ou du compte utilisateur, puis redémarrer le terminal et les services concernés. Par exemple, depuis un terminal PowerShell ouvert avec les droits nécessaires :
+
+```powershell
+[Environment]::SetEnvironmentVariable("DB_YCYW_NAME", "ycyw_poc", "Machine")
+[Environment]::SetEnvironmentVariable("DB_USER", "postgres", "Machine")
+[Environment]::SetEnvironmentVariable("DB_PASSWORD", "<mot-de-passe-a-fournir-hors-du-depot>", "Machine")
+[Environment]::SetEnvironmentVariable("JWT_SECRET", "<secret-a-fournir-hors-du-depot>", "Machine")
+```
+
+Le niveau `Machine` concerne tous les utilisateurs et peut nécessiter des droits administrateur. Pour limiter la configuration au compte courant, remplacer `Machine` par `User`.
+
+Dans un environnement de production, ne pas stocker les secrets en clair dans les variables système, un script, le dépôt ou la documentation. Utiliser le gestionnaire de secrets fourni par l'infrastructure de déploiement, puis injecter les valeurs au démarrage de l'application.
+
+Ne pas committer ces valeurs. Le backend utilise aussi, si nécessaire, les variables optionnelles suivantes :
+
+| Variable | Valeur par défaut | Utilisation |
+| --- | --- | --- |
+| `JWT_EXPIRATION_SECONDS` | `900` | Durée du JWT d'accès |
+| `JWT_REFRESH_EXPIRATION_SECONDS` | `2592000` | Durée du refresh token |
+| `JWT_COOKIE_NAME` | `access_token` | Nom du cookie JWT |
+| `JWT_REFRESH_COOKIE_NAME` | `refresh_token` | Nom du cookie de refresh |
+| `JWT_COOKIE_SECURE` | `false` | Cookie HTTPS ou non |
+| `JWT_COOKIE_SAMESITE` | `Lax` | Politique SameSite |
+
+### Initialisation automatique par Spring
+
+Au démarrage, Spring exécute les scripts SQL suivants depuis `back/src/main/resources` :
+
+```text
+00_extensions_and_settings.sql
+01_acriss_vehicle.sql
+02_types_enums.sql
+03_auth_schema.sql
+04_core_domain.sql
+05_chat.sql
+07_indexes_constraints.sql
+08_reference_data.sql
+09_person_seed.sql
+```
+
+Le script `06_triggers_and_functions.sql` n'est pas exécuté par le séparateur SQL Spring, car il contient des blocs PL/pgSQL. Pour appliquer l'ensemble du schéma, utiliser la procédure documentée dans [Livrables/Database/INSTALL.md](../Livrables/Database/INSTALL.md) et le script `Livrables/Database/apply_all.ps1`.
+
+## Démarrer le backend
+
+Depuis `PoC/back`, après avoir défini les variables PostgreSQL et JWT :
 
 ```powershell
 Set-Location PoC\back
 .\mvnw.cmd spring-boot:run
 ```
 
-Le backend est disponible sur `http://localhost:8080`.
+Le backend démarre sur `http://localhost:8080`.
 
-## Installer et demarrer le frontend
+## Démarrer le frontend
 
 Dans un second terminal :
 
 ```powershell
 Set-Location PoC\front
 npm ci
-npm start -- --configuration normal
+npm start
 ```
 
-La configuration `normal` utilise le vrai backend via [proxy.conf.json](front/proxy.conf.json). Ouvrir ensuite `http://localhost:4200`.
+Ouvrir ensuite `http://localhost:4200`.
 
-Attention : `npm start` sans configuration utilise `environment.dev.ts`, qui active les services mock. Ce mode est utile pour le developpement visuel mais ne valide pas la persistance PostgreSQL ni les SSE du backend.
+Le frontend utilise `proxy.conf.json` pour transmettre les appels `/api` vers `http://localhost:8080`. La configuration par défaut utilise `environment.ts` et les services réels.
 
-## Comptes de demonstration
+### Mode mock
 
-Les comptes sont crees par `09_person_seed.sql` au premier demarrage du backend :
+Le mode mock permet de tester l'interface sans démarrer PostgreSQL ni le backend :
+
+```powershell
+npm start -- --configuration dev
+```
+
+Ce mode utilise `environment.dev.ts`, `AuthMockService`, `ChatMockService` et les autres services mock. Il ne valide pas la persistance, l'authentification backend, la protection CSRF ou les SSE réels.
+
+La configuration Angular `normal` utilise également les services réels. Elle ne correspond pas à un fichier `environment.normal.ts` : ce fichier n'existe pas dans la PoC.
+
+## Comptes de démonstration
+
+Les comptes sont créés par `09_person_seed.sql` :
 
 | Role | Identifiant | Mot de passe |
 | --- | --- | --- |
@@ -119,49 +178,86 @@ Les comptes sont crees par `09_person_seed.sql` au premier demarrage du backend 
 | Client | `client_02@gmail.com` | `Client_02@MDP` |
 | Client | `client_03@gmail.com` | `Client_03@MDP` |
 
-Ces comptes sont strictement destines a la demonstration locale.
+Ces comptes sont uniquement destinés à la démonstration locale.
 
-## Parcours de validation manuelle
+## Statuts d'une conversation
 
-### Parcours client/agent
+Le backend utilise les valeurs suivantes :
 
-1. Se connecter avec `client_01@gmail.com`.
-2. Creer une conversation depuis `Nouveau chat`.
-3. Ouvrir la conversation et envoyer un message.
-4. Ouvrir une seconde fenetre privee et se connecter avec `agent_01@gmail.com`.
-5. Verifier que la conversation apparait dans `En attente` ou `Tous`.
-6. Cliquer sur `Prendre` et verifier le passage a `Attribue`.
-7. Depuis le client, envoyer un nouveau message et verifier sa reception dans la conversation agent.
-8. Depuis le client, cliquer sur `Cloturer`.
-9. Verifier que l'agent revient a la liste apres l'evenement SSE.
-10. Verifier que la conversation apparait dans `Cloturees`, sans bouton d'action.
-11. Verifier qu'aucun nouveau message ne peut etre envoye apres cloture.
+| Valeur API | Libellé dans l'interface | Signification |
+| --- | --- | --- |
+| `open` | En attente | La conversation peut être prise par un agent |
+| `assigned` | Attribuée | Un agent est affecté à la conversation |
+| `waiting_reassignment` | Sans agent | L'agent précédent a libéré la conversation |
+| `closed` | Clôturée | Le client a terminé la conversation |
+| `archived` | Clôturée | Conversation conservée dans l'historique |
 
-### Parcours liberation
+Lorsqu'une conversation est `assigned`, le champ `assignedAgentId` contient l'identifiant de l'agent actif. Le bouton `Libérer` apparaît uniquement si cet identifiant correspond à l'agent connecté. Une conversation attribuée à un autre agent n'est pas ouvrable depuis le tableau de bord agent.
 
-1. Depuis une conversation attribuee, l'agent clique sur `Libérer`.
-2. Verifier le statut `Sans agent`.
-3. Verifier que la conversation revient dans `En attente` et peut etre reprise.
+## Parcours de validation
+
+### Parcours client et agent
+
+1. Se connecter comme `client_01@gmail.com`.
+2. Créer une conversation avec `Nouveau chat`.
+3. Ouvrir la conversation et envoyer un premier message.
+4. Ouvrir une fenêtre privée et se connecter comme `agent_01@gmail.com`.
+5. Ouvrir le filtre `En attente` ou `Tous`.
+6. Cliquer sur `Prendre`. La conversation passe à `assigned` et `assignedAgentId` prend l'identifiant de l'agent.
+7. Vérifier que le bouton `Libérer` est visible pour cet agent, dans la liste et dans le détail de la conversation.
+8. Depuis la fenêtre client, envoyer un nouveau message et vérifier sa réception côté agent.
+9. Depuis le client, cliquer sur `Clôturer`.
+10. Vérifier que l'agent revient à la liste après l'événement SSE.
+11. Vérifier que la conversation apparaît dans `Clôturées` et qu'aucun nouveau message ne peut être envoyé.
+
+### Parcours de libération et de reprise
+
+1. Depuis une conversation attribuée à l'agent connecté, cliquer sur `Libérer`.
+2. Vérifier le passage à `waiting_reassignment` et la remise à `null` de `assignedAgentId`.
+3. Vérifier que la conversation revient dans `En attente`.
+4. Cliquer sur `Prendre` pour vérifier qu'elle peut être reprise.
+
+### Controle des droits
+
+1. Attribuer une conversation à `agent_01@gmail.com`.
+2. Se connecter avec `agent_02@gmail.com`.
+3. Vérifier que la conversation est visible dans les listes générales, mais qu'elle n'est pas ouvrable.
+4. Vérifier que l'agent 2 ne voit pas le bouton `Libérer`.
+5. Vérifier qu'un appel direct à l'API de libération est refusé par le backend.
 
 ## API du tchat
 
-Les routes sont exposees sous `/api/chats` :
+Les routes du tchat sont exposées sous `/api/chats` :
 
-| Methode | Route | Utilisation |
+| Méthode | Route | Utilisation |
 | --- | --- | --- |
-| `POST` | `/api/chats` | Creer une conversation |
-| `GET` | `/api/chats` | Lister les conversations du client |
-| `GET` | `/api/chats/agent-view?filter=all` | Vue agent filtree |
-| `GET` | `/api/chats/{id}` | Consulter une conversation |
+| `POST` | `/api/chats` | Créer une conversation |
+| `GET` | `/api/chats` | Lister les conversations de l'utilisateur |
+| `GET` | `/api/chats/open` | Lister les conversations disponibles pour un agent |
+| `GET` | `/api/chats/agent-view?filter=all` | Vue agent filtrée |
+| `GET` | `/api/chats/{id}` | Consulter une conversation autorisée |
 | `POST` | `/api/chats/{id}/claim` | Prendre une conversation |
-| `POST` | `/api/chats/{id}/release` | Liberer une conversation |
-| `POST` | `/api/chats/{id}/close` | Cloturer cote client |
+| `POST` | `/api/chats/{id}/release` | Libérer sa conversation attribuée |
+| `POST` | `/api/chats/{id}/close` | Clôturer côté client |
+| `GET` | `/api/chats/{id}/participants` | Lister les participants |
+| `POST` | `/api/chats/{id}/participants` | Ajouter un participant autorisé |
 | `GET` | `/api/chats/{id}/messages` | Lire les messages |
 | `POST` | `/api/chats/{id}/messages` | Envoyer un message |
-| `GET` | `/api/chats/{id}/events` | Flux SSE d'une conversation |
-| `GET` | `/api/chats/agent-events` | Flux SSE du dashboard agent |
+| `GET` | `/api/chats/{id}/events` | Écouter les événements SSE de la conversation |
+| `GET` | `/api/chats/agent-events` | Écouter les changements du tableau de bord agent |
 
-Les requetes modifiantes utilisent les cookies d'authentification et le jeton CSRF gere par le frontend.
+Les routes d'authentification utilisées par le frontend sont exposées sous `/api/auth` :
+
+| Méthode | Route | Utilisation |
+| --- | --- | --- |
+| `GET` | `/api/auth/csrf` | Initialiser le cookie CSRF |
+| `POST` | `/api/auth/login` | Ouvrir une session |
+| `POST` | `/api/auth/register` | Créer un compte |
+| `POST` | `/api/auth/refresh` | Renouveler la session |
+| `POST` | `/api/auth/logout` | Fermer la session |
+| `GET` | `/api/auth/me` | Récupérer l'utilisateur courant |
+
+Les requêtes modifiantes utilisent les cookies d'authentification et le header CSRF géré par le frontend. Les cookies ne sont pas lus directement par le code Angular.
 
 ## Tests et build
 
@@ -175,345 +271,59 @@ npm run test:unit:ci
 npm run cypress:run
 ```
 
+Le build peut afficher des avertissements concernant le budget de certains fichiers SCSS. Ils ne constituent pas une erreur tant que la commande se termine avec le code `0`.
+
 ### Backend
 
-Depuis `PoC/back`, avec les variables PostgreSQL definies :
+Depuis `PoC/back`, avec PostgreSQL demarre et les variables d'environnement definies :
 
 ```powershell
 .\mvnw.cmd test
 .\mvnw.cmd verify
 ```
 
-Les tests Cypress existants couvrent principalement l'authentification et des parcours historiques. Le parcours tchat doit donc egalement etre valide manuellement avec le scenario ci-dessus.
+Les tests backend utilisent la base configurée par le profil de développement. Le parcours complet du tchat, notamment le fonctionnement entre deux utilisateurs, doit aussi être validé manuellement avec les scénarios précédents.
 
-## Structure détaillée du projet
-
-Le dépôt contient les livrables du projet ainsi qu'une preuve de concept complète du parcours de tchat.
+## Structure réelle de la PoC
 
 ```text
-Projet-10/
-│
-├── PoC/
-│   ├── README.md
-│   │   └── Guide d'installation, de démarrage et de validation manuelle
-│   │
-│   ├── back/
-│   │   ├── pom.xml
-│   │   │   └── Dépendances Maven et configuration du projet Spring Boot
-│   │   │
-│   │   ├── mvnw
-│   │   ├── mvnw.cmd
-│   │   │   └── Wrappers Maven pour Linux/macOS et Windows
-│   │   │
-│   │   └── src/
-│   │       ├── main/
-│   │       │   ├── java/
-│   │       │   │   └── .../
-│   │       │   │       ├── Application.java
-│   │       │   │       │   └── Point d'entrée de l'application Spring Boot
-│   │       │   │       │
-│   │       │   │       ├── config/
-│   │       │   │       │   ├── Configuration Spring et Spring Security
-│   │       │   │       │   ├── Configuration CORS
-│   │       │   │       │   ├── Configuration CSRF
-│   │       │   │       │   └── Configuration des cookies et des flux SSE
-│   │       │   │       │
-│   │       │   │       ├── controller/
-│   │       │   │       │   ├── Contrôleurs REST d'authentification
-│   │       │   │       │   ├── Contrôleurs REST des conversations
-│   │       │   │       │   ├── Contrôleurs REST des messages
-│   │       │   │       │   └── Contrôleurs des flux Server-Sent Events
-│   │       │   │       │
-│   │       │   │       ├── service/
-│   │       │   │       │   ├── Gestion des utilisateurs
-│   │       │   │       │   ├── Création et consultation des conversations
-│   │       │   │       │   ├── Envoi et lecture des messages
-│   │       │   │       │   ├── Prise en charge et libération des conversations
-│   │       │   │       │   ├── Clôture des conversations
-│   │       │   │       │   ├── Gestion des événements SSE
-│   │       │   │       │   └── Création, rotation et révocation des refresh tokens
-│   │       │   │       │
-│   │       │   │       ├── repository/
-│   │       │   │       │   ├── Accès aux utilisateurs
-│   │       │   │       │   ├── Accès aux conversations
-│   │       │   │       │   ├── Accès aux messages
-│   │       │   │       │   └── Accès aux refresh tokens
-│   │       │   │       │
-│   │       │   │       ├── entity/
-│   │       │   │       │   ├── Entité utilisateur
-│   │       │   │       │   ├── Entité conversation
-│   │       │   │       │   ├── Entité message
-│   │       │   │       │   └── Entité refresh token
-│   │       │   │       │
-│   │       │   │       ├── dto/
-│   │       │   │       │   ├── Objets de requête d'authentification
-│   │       │   │       │   ├── Objets de réponse d'authentification
-│   │       │   │       │   ├── Objets de conversation
-│   │       │   │       │   ├── Objets de message
-│   │       │   │       │   └── Objets utilisés par les événements SSE
-│   │       │   │       │
-│   │       │   │       ├── security/
-│   │       │   │       │   ├── Génération et validation des JWT
-│   │       │   │       │   ├── Filtre d'authentification JWT
-│   │       │   │       │   ├── Gestion des cookies HttpOnly
-│   │       │   │       │   ├── Gestion des refresh tokens
-│   │       │   │       │   └── Contrôle des rôles et des droits d'accès
-│   │       │   │       │
-│   │       │   │       ├── exception/
-│   │       │   │       │   ├── Exceptions métier
-│   │       │   │       │   ├── Gestion des erreurs REST
-│   │       │   │       │   └── Réponses d'erreur standardisées
-│   │       │   │       │
-│   │       │   │       └── sse/
-│   │       │   │           ├── Gestion des connexions SSE
-│   │       │   │           ├── Gestion des émetteurs SseEmitter
-│   │       │   │           ├── Diffusion des nouveaux messages
-│   │       │   │           └── Notification des changements d'état
-│   │       │   │
-│   │       │   └── resources/
-│   │       │       ├── application.properties
-│   │       │       │   └── Configuration générale de l'API et de la base de données
-│   │       │       │
-│   │       │       ├── application-test.properties
-│   │       │       │   └── Configuration utilisée pendant les tests
-│   │       │       │
-│   │       │       └── db/
-│   │       │           └── migration/
-│   │       │               ├── Scripts de création des tables
-│   │       │               ├── Scripts de création des contraintes et index
-│   │       │               ├── Scripts de création des rôles applicatifs
-│   │       │               └── 09_person_seed.sql
-│   │       │                   └── Comptes de démonstration client et agent
-│   │       │
-│   │       └── test/
-│   │           ├── java/
-│   │           │   ├── Tests unitaires des services
-│   │           │   ├── Tests des contrôleurs REST
-│   │           │   ├── Tests de sécurité
-│   │           │   ├── Tests des règles d'accès
-│   │           │   └── Tests d'intégration Spring Boot
-│   │           │
-│   │           └── resources/
-│   │               └── Configuration et données utilisées par les tests
-│   │
-│   └── front/
-│       ├── package.json
-│       │   └── Dépendances npm et scripts de développement, de test et de build
-│       │
-│       ├── package-lock.json
-│       │   └── Versions exactes des dépendances npm
-│       │
-│       ├── angular.json
-│       │   └── Configuration du workspace Angular
-│       │
-│       ├── tsconfig.json
-│       ├── tsconfig.app.json
-│       ├── tsconfig.spec.json
-│       │   └── Configuration TypeScript de l'application et des tests
-│       │
-│       ├── proxy.conf.json
-│       │   └── Redirection des appels frontend vers l'API Spring Boot
-│       │
-│       ├── cypress.config.ts
-│       │   └── Configuration des tests end-to-end Cypress
-│       │
-│       └── src/
-│           ├── index.html
-│           │   └── Page HTML principale
-│           │
-│           ├── main.ts
-│           │   └── Point d'entrée de l'application Angular
-│           │
-│           ├── styles.scss
-│           │   └── Styles globaux de l'application
-│           │
-│           ├── environments/
-│           │   ├── environment.dev.ts
-│           │   │   └── Configuration du mode de développement avec services mock
-│           │   │
-│           │   └── environment.normal.ts
-│           │       └── Configuration utilisant le véritable backend
-│           │
-│           ├── app/
-│           │   ├── app.component.*
-│           │   │   └── Composant racine de l'application
-│           │   │
-│           │   ├── app.config.ts
-│           │   │   └── Configuration des providers Angular
-│           │   │
-│           │   ├── app.routes.ts
-│           │   │   └── Déclaration des routes de l'application
-│           │   │
-│           │   ├── core/
-│           │   │   ├── guards/
-│           │   │   │   └── Protection des routes nécessitant une authentification
-│           │   │   │
-│           │   │   ├── interceptors/
-│           │   │   │   ├── Ajout des credentials aux requêtes HTTP
-│           │   │   │   ├── Gestion des erreurs d'authentification
-│           │   │   │   └── Gestion du jeton CSRF
-│           │   │   │
-│           │   │   ├── services/
-│           │   │   │   ├── Service d'authentification
-│           │   │   │   ├── Service de gestion des conversations
-│           │   │   │   ├── Service de gestion des messages
-│           │   │   │   ├── Service SSE
-│           │   │   │   └── Service de gestion de l'état utilisateur
-│           │   │   │
-│           │   │   └── models/
-│           │   │       ├── Modèles utilisateur et rôle
-│           │   │       ├── Modèles conversation et statut
-│           │   │       ├── Modèle message
-│           │   │       └── Modèles de réponse de l'API
-│           │   │
-│           │   ├── features/
-│           │   │   ├── auth/
-│           │   │   │   ├── Page de connexion
-│           │   │   │   ├── Gestion de la session
-│           │   │   │   └── Déconnexion
-│           │   │   │
-│           │   │   ├── client/
-│           │   │   │   ├── Liste des conversations du client
-│           │   │   │   ├── Création d'une conversation
-│           │   │   │   ├── Consultation d'une conversation
-│           │   │   │   ├── Envoi de messages
-│           │   │   │   └── Clôture d'une conversation
-│           │   │   │
-│           │   │   └── agent/
-│           │   │       ├── Tableau de bord agent
-│           │   │       ├── Filtres des conversations
-│           │   │       ├── Prise en charge d'une conversation
-│           │   │       ├── Libération d'une conversation
-│           │   │       ├── Consultation des messages
-│           │   │       └── Réception des mises à jour SSE
-│           │   │
-│           │   ├── shared/
-│           │   │   ├── components/
-│           │   │   │   ├── En-tête et navigation
-│           │   │   │   ├── Affichage d'un message
-│           │   │   │   ├── Liste de conversations
-│           │   │   │   ├── Indicateurs de statut
-│           │   │   │   └── Boutons et composants communs
-│           │   │   │
-│           │   │   ├── pipes/
-│           │   │   │   └── Formatage des dates, statuts et libellés
-│           │   │   │
-│           │   │   └── validators/
-│           │   │       └── Validateurs des formulaires
-│           │   │
-│           │   └── mocks/
-│           │       ├── Données de démonstration
-│           │       ├── Services mock
-│           │       └── Réponses simulées de l'API
-│           │
-│           ├── assets/
-│           │   ├── images/
-│           │   ├── icônes/
-│           │   └── ressources statiques
-│           │
-│           └── tests/
-│               ├── Tests unitaires Jest/Karma
-│               └── Tests end-to-end Cypress
-│
-├── Livrables/
-│   ├── Database/
-│   │   ├── INSTALL.md
-│   │   │   └── Installation et initialisation de la base PostgreSQL
-│   │   └── Scripts SQL et documentation du modèle de données
-│   │
-│   ├── Architecture/
-│   │   └── Documents décrivant l'architecture cible et les choix techniques
-│   │
-│   ├── Conception/
-│   │   └── Documents fonctionnels, techniques et diagrammes
-│   │
-│   └── .../
-│       └── Autres documents nécessaires à la présentation du projet
-│
-└── .gitignore
-    └── Fichiers exclus du dépôt : variables d'environnement, dépendances,
-        fichiers générés et configurations locales
+PoC/
+├── README.md
+├── back/
+│   ├── pom.xml
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   └── src/
+│       ├── main/
+│       │   ├── java/com/openclassrooms/yourwayapi/
+│       │   │   ├── controller/       # Routes HTTP REST et SSE
+│       │   │   ├── dto/              # Objets d'échange avec le frontend
+│       │   │   ├── entity/           # Entités JPA
+│       │   │   ├── exception/        # Gestion des erreurs API
+│       │   │   ├── repository/       # Accès PostgreSQL
+│       │   │   ├── security/         # JWT, cookies et refresh tokens
+│       │   │   └── service/          # Règles métier
+│       │   └── resources/
+│       │       ├── application.properties
+│       │       └── scripts SQL de la base
+│       └── test/java/                # Tests JUnit et Spring Boot
+└── front/
+    ├── package.json
+    ├── angular.json
+    ├── proxy.conf.json
+    └── src/
+        ├── environments/             # Configurations mock et réelle
+        └── app/
+            ├── core/                 # Authentification, modèles et services
+            ├── features/chat/        # Liste, création et détail du tchat
+            ├── shared/               # Composants partagés
+            └── store/                # État frontend
 ```
 
-### Organisation du backend
+Les scripts SQL et leur procédure d'installation complète se trouvent dans [Livrables/Database](../Livrables/Database). Les documents d'architecture du projet sont conservés dans `Livrables/`, mais ils ne décrivent pas des composants installés dans cette PoC.
 
-Le backend est organisé selon une séparation entre :
+## Limites connues
 
-- les contrôleurs, qui exposent l'API HTTP ;
-- les services, qui contiennent les règles métier ;
-- les repositories, qui communiquent avec PostgreSQL ;
-- les entités, qui représentent les tables de la base ;
-- les DTO, qui définissent les données échangées avec le frontend ;
-- la couche de sécurité, qui gère les JWT, les cookies HttpOnly, les refresh tokens, les rôles et la protection CSRF ;
-- la couche SSE, qui diffuse les changements en temps réel aux clients connectés.
+Cette PoC est une démonstration fonctionnelle locale. Elle n'utilise pas de migrations versionnées, de gestion de secrets de production, de scalabilité horizontale, de broker de messages ou de supervision complète des flux SSE.
 
-Les règles d'accès sont contrôlées côté backend. Le frontend masque certaines actions selon le rôle de l'utilisateur, mais cette restriction d'affichage ne remplace pas les contrôles réalisés par l'API.
-
-### Organisation du frontend
-
-Le frontend Angular est divisé en plusieurs niveaux :
-
-- `core/` contient les services et mécanismes globaux de l'application ;
-- `features/` contient les fonctionnalités métier, séparées entre les parcours client, agent et authentification ;
-- `shared/` contient les composants réutilisables ;
-- `mocks/` permet de lancer l'interface sans backend ni base PostgreSQL ;
-- `environments/` contient les configurations propres aux différents modes de lancement ;
-- `tests/` regroupe les tests unitaires et end-to-end.
-
-### Modes de fonctionnement du frontend
-
-Deux modes principaux sont disponibles :
-
-- **Mode développement** : utilise `environment.dev.ts` et les services mock. Il permet de travailler sur l'interface sans démarrer PostgreSQL ni le backend.
-- **Mode normal** : utilise `environment.normal.ts`, le proxy Angular et le véritable backend Spring Boot. Il permet de valider l'authentification, la persistance PostgreSQL, les droits d'accès et les événements SSE.
-
-### Flux principal d'une fonctionnalité de tchat
-
-Pour une action telle que l'envoi d'un message, le traitement suit généralement ce chemin :
-
-1. Le composant Angular collecte la saisie de l'utilisateur.
-2. Le service frontend envoie une requête HTTP à l'API.
-3. Les intercepteurs ajoutent les informations nécessaires à la requête, notamment les cookies et le jeton CSRF.
-4. Le contrôleur Spring reçoit la requête.
-5. Le service backend vérifie l'utilisateur, son rôle et ses droits sur la conversation.
-6. Le message est enregistré en base via le repository.
-7. Le backend publie un événement SSE.
-8. Les clients connectés mettent à jour leur interface sans rechargement de page.
-
-### Flux des données
-
-```text
-Utilisateur
-    │
-    ▼
-Composant Angular
-    │
-    ▼
-Service frontend
-    │
-    ▼
-Intercepteurs HTTP
-    │
-    ▼
-API REST Spring Boot
-    │
-    ├── Contrôle de sécurité et des droits
-    ├── Validation des données
-    ├── Application des règles métier
-    ├── Persistance PostgreSQL
-    └── Publication d'un événement SSE
-            │
-            ▼
-       Interfaces client et agent
-```
-
-Cette organisation permet de conserver une séparation claire entre l'interface, la logique métier, la sécurité, la persistance et la communication temps réel.
-```
-
-Les documents d'architecture et de conception se trouvent dans `Livrables/`.
-
-## Limites de la PoC
-
-Cette PoC ne met pas en oeuvre les composants d'industrialisation de l'architecture cible, notamment Redis, RabbitMQ, Kubernetes, observabilite complete, paiement et CI/CD de production. Ils sont decrits dans les livrables d'architecture mais restent hors du perimetre de cette demonstration ciblee sur le tchat.
-
-Pour une mise en production, il faudrait notamment ajouter des migrations versionnees, une gestion de secrets, une supervision des flux SSE, une strategie de scalabilite et des tests E2E specialises sur le tchat.
+Avant une mise en production, il faudrait notamment ajouter une stratégie de migrations, une gestion sécurisée des secrets, une supervision des connexions SSE, des tests E2E spécialisés sur le tchat et une architecture de déploiement adaptée à la charge.
