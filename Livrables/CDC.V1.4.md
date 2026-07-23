@@ -123,6 +123,8 @@ En tant que client, je veux afficher les offres de location à partir de critèr
 
 **Critères d’acceptation** :
 - Étant donné un client, quand il renseigne une ville de départ, une ville de retour, une date et une heure de début, une date et une heure de retour et une catégorie de véhicule ACRISS, alors les offres de location correspondantes sont affichées.
+- Étant donné une recherche valide, quand les offres sont affichées, alors les résultats sont paginés et le nombre d’offres chargées initialement est limité afin de réduire les données transférées.
+- Étant donné une recherche comportant plusieurs pages de résultats, quand le client demande une autre page, alors seuls les résultats de la page demandée sont chargés.
 - Étant donné un client naviguant au clavier, quand il utilise le formulaire de recherche, alors il peut atteindre et renseigner tous les champs sans souris.
 - Étant donné un client utilisant un lecteur d’écran, quand il utilise le formulaire de recherche, alors les champs, leurs libellés et les messages associés sont compréhensibles.
 
@@ -150,6 +152,10 @@ En tant que client disposant d’une réservation, je veux consulter l’histori
 
 **Critères d’acceptation** :
 - Étant donné un client disposant d’un compte, quand il consulte son historique, alors ses réservations passées et en cours sont affichées.
+- Étant donné un client consultant son historique sans filtre personnalisé, quand la page est ouverte, alors les réservations des 30 derniers jours sont affichées par défaut et les résultats sont paginés.
+- Étant donné un client consultant son historique, quand il souhaite retrouver une réservation plus ancienne, alors il peut élargir la période de recherche ou saisir une période personnalisée.
+- Étant donné un client ayant choisi une période ou une page, quand il actualise la page, alors les critères de recherche sont conservés.
+- Étant donné un client ayant modifié les critères de son historique, quand il réinitialise les filtres, alors l’application revient à la période et à la pagination par défaut.
 - Étant donné un client naviguant au clavier ou à l’aide d’un lecteur d’écran, quand il consulte son historique, alors il peut parcourir ses réservations et distinguer les informations utiles sans dépendre d’un code couleur seul.
 
 ---
@@ -251,6 +257,8 @@ En tant que client, y compris en situation de handicap, je veux que ma session s
 ### **7. Exigences transverses : impact écologique**
 
 - Les échanges réseau doivent limiter les données transférées : réponses paginées, champs nécessaires uniquement et compression adaptée.
+- Les recherches et historiques utilisent une pagination côté serveur et un périmètre initial limité. Les valeurs par défaut sont modifiables par l’utilisateur et ne constituent pas une restriction d’accès aux données.
+- Les requêtes doivent éviter de charger l’intégralité d’un historique ou d’une liste lorsque seule une page de résultats est affichée.
 - Les images de véhicules doivent être redimensionnées et servies dans un format adapté au contexte d’affichage.
 - Les contenus statiques doivent pouvoir être mis en cache afin de limiter les traitements et transferts répétés.
 - L’architecture doit privilégier un hébergement et des services d’infrastructure dont l’impact environnemental est documenté, dans la limite du budget et de la disponibilité régionale.
