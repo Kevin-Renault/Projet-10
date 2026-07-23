@@ -39,7 +39,7 @@ Règles générales : identifiants en UUIDv4, timestamps ISO8601, formats JSON (
 - Réservation
   - Créer une réservation pour une offre disponible (statut initial : pending).
   - Règle de modification : possible si > 48h avant début.
-  - Règle d'annulation : >7 jours → 100% remboursé; <7 jours → 25%; <48h → 0%.
+  - Règle d'annulation : à partir de 7 jours inclus → 100% remboursé; moins de 7 jours → 25%.
 
 - Paiement
   - Initier un paiement via un fournisseur externe (Stripe/PayPal) et recevoir confirmation via webhook.
@@ -164,9 +164,8 @@ En tant que client disposant d’une réservation, je veux modifier ma réservat
 En tant que client disposant d’une réservation, je veux annuler ma réservation afin de renoncer à la location.
 
 **Critères d’acceptation** :
-- Étant donné une réservation, quand le client l’annule **à plus de 7 jours de son début**, alors le remboursement est de **100%**.
+- Étant donné une réservation, quand le client l’annule **à 7 jours ou plus de son début**, alors le remboursement est de **100%**.
 - Étant donné une réservation, quand le client l’annule **à moins de 7 jours de son début**, alors le remboursement est limité à **25%** du montant total.
-- Étant donné une réservation, quand le client l’annule **à moins de 48h de son début**, alors **aucun remboursement** n’est effectué.
 
 ---
 ### **3. Intégration avec les applications d’agence**
