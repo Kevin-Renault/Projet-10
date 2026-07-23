@@ -1,4 +1,5 @@
 .venv/
+/Contexte/
 
 # IDE and local tooling
 .vscode/*.log
