@@ -289,6 +289,7 @@ erDiagram
   }
   VEHICLE {
     bigint id PK
+    uuid vehicle_uuid UK
     string acriss_code
     string make
     string model
@@ -343,6 +344,7 @@ erDiagram
   }
   CHAT_TEXT {
     bigint id PK
+    uuid chat_text_uuid UK
     bigint chat_id FK
     bigint sender_id FK
     string content_type
@@ -456,6 +458,7 @@ classDiagram
   }
   class Vehicle {
     +Long id PK
+    +UUID vehicle_uuid UK
     +String acriss_code
     +String make
     +String model
@@ -509,6 +512,7 @@ classDiagram
   }
   class ChatText {
     +Long id PK
+    +UUID chat_text_uuid UK
     +Long chat_id FK
     +Long sender_id FK
     +ChatContentType content_type

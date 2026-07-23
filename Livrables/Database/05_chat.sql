@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS chat_participant_metadata (
 CREATE INDEX IF NOT EXISTS idx_chat_participant_metadata_participant ON chat_participant_metadata(chat_participant_id);
 CREATE TABLE IF NOT EXISTS chat_text (
     id BIGSERIAL PRIMARY KEY,
+    chat_text_uuid uuid NOT NULL DEFAULT gen_random_uuid(),
     chat_id BIGINT NOT NULL,
     sender_id BIGINT NULL,
     content_type chat_content_type DEFAULT 'text',
@@ -66,6 +67,7 @@ CREATE TABLE IF NOT EXISTS chat_text (
     status chat_text_status_type DEFAULT 'sent',
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE (chat_text_uuid),
     FOREIGN KEY (chat_id) REFERENCES chat(id) ON DELETE CASCADE,
     FOREIGN KEY (sender_id) REFERENCES ycyw_user(id) ON DELETE
     SET NULL

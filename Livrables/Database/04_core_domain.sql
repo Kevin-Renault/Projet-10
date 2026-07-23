@@ -22,6 +22,7 @@ DROP TABLE IF EXISTS currency CASCADE;
 -- ////////////////////////////////////////////////////////////////////////////
 CREATE TABLE IF NOT EXISTS vehicle (
     id BIGSERIAL PRIMARY KEY,
+    vehicle_uuid uuid NOT NULL DEFAULT gen_random_uuid(),
     reference VARCHAR(100) NULL,
     make VARCHAR(100) NULL,
     model VARCHAR(100) NULL,
@@ -45,6 +46,7 @@ CREATE TABLE IF NOT EXISTS vehicle (
         acriss_code IS NULL
         OR acriss_code ~ '^[A-Z0-9]{4}$'
     ),
+    UNIQUE (vehicle_uuid),
     FOREIGN KEY (owner_agence_id) REFERENCES agence(id) ON DELETE
     SET NULL,
         FOREIGN KEY (current_agence_id) REFERENCES agence(id) ON DELETE
