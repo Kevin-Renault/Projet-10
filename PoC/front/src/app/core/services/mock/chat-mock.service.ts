@@ -24,7 +24,8 @@ export class ChatMockService implements ChatDataSource {
             subject: 'Accompagnement Java',
             bookingId: null,
             createdBy: 1,
-            status: 'open',
+            status: 'assigned',
+            assignedAgentId: 2,
             createdAt: '2024-02-01T09:00:00Z',
             updatedAt: '2024-02-02T14:30:00Z'
         },
@@ -35,6 +36,7 @@ export class ChatMockService implements ChatDataSource {
             bookingId: null,
             createdBy: 2,
             status: 'open',
+            assignedAgentId: null,
             createdAt: '2024-02-03T10:00:00Z',
             updatedAt: '2024-02-03T11:15:00Z'
         }
@@ -124,6 +126,7 @@ export class ChatMockService implements ChatDataSource {
             bookingId: payload.bookingId ?? null,
             createdBy: this.currentUserId,
             status: 'open',
+            assignedAgentId: null,
             createdAt: now,
             updatedAt: now
         };
@@ -146,6 +149,7 @@ export class ChatMockService implements ChatDataSource {
 
         const chat = this.chats.find(item => item.id === chatId)!;
         chat.status = 'assigned';
+        chat.assignedAgentId = this.currentUserId;
         this.participants.push({
             id: Date.now(),
             chatId,
@@ -164,8 +168,12 @@ export class ChatMockService implements ChatDataSource {
         const chat = this.chats.find(item => item.id === chatId)!;
         const participant = this.participants.find(item =>
             item.chatId === chatId && item.userId === this.currentUserId && item.role === 'agent' && !item.leftAt);
-        if (participant) participant.leftAt = new Date().toISOString();
+        if (!participant || chat.status !== 'assigned' || chat.assignedAgentId !== this.currentUserId) {
+            return throwError(() => new Error('Cette conversation n est pas attribuee a cet agent.'));
+        }
+        participant.leftAt = new Date().toISOString();
         chat.status = 'waiting_reassignment';
+        chat.assignedAgentId = null;
         return of(chat);
     }
 

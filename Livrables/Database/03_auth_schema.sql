@@ -1,4 +1,18 @@
--- 02_auth_schema.sql
+-- 03_auth_schema.sql
+-- SAFE DROP BLOCK
+-- Drop auth-related objects in dependency order (dependents first)
+DROP TABLE IF EXISTS user_accessibility_pref CASCADE;
+DROP TABLE IF EXISTS refresh_token CASCADE;
+DROP TABLE IF EXISTS service_account_scope CASCADE;
+DROP TABLE IF EXISTS service_account CASCADE;
+DROP TABLE IF EXISTS agent_profile_permission CASCADE;
+DROP TABLE IF EXISTS agent_profile CASCADE;
+DROP TABLE IF EXISTS email_verification CASCADE;
+DROP TABLE IF EXISTS user_profile CASCADE;
+DROP TABLE IF EXISTS permission CASCADE;
+DROP TABLE IF EXISTS ycyw_user CASCADE;
+DROP TABLE IF EXISTS agence_opening_hour CASCADE;
+DROP TABLE IF EXISTS agence CASCADE;
 -- EN: User, profile, service account, refresh_token tables
 -- FR: Utilisateurs, profils, comptes de service, refresh_token
 CREATE TABLE IF NOT EXISTS agence (
@@ -18,7 +32,9 @@ CREATE TABLE IF NOT EXISTS agence_opening_hour (
     opens_at TIME NOT NULL,
     closes_at TIME NOT NULL,
     UNIQUE (agence_id, day_of_week),
-    CHECK (day_of_week BETWEEN 0 AND 6),
+    CHECK (
+        day_of_week BETWEEN 0 AND 6
+    ),
     CHECK (opens_at < closes_at),
     FOREIGN KEY (agence_id) REFERENCES agence(id) ON DELETE CASCADE
 );
@@ -42,7 +58,9 @@ CREATE TABLE IF NOT EXISTS ycyw_user (
     user_status VARCHAR(20) NOT NULL DEFAULT 'pending',
     created_at TIMESTAMPTZ DEFAULT now(),
     last_login TIMESTAMPTZ NULL,
-    CHECK (user_status IN ('pending', 'active', 'suspended', 'deleted')),
+    CHECK (
+        user_status IN ('pending', 'active', 'suspended', 'deleted')
+    ),
     FOREIGN KEY (agence_id) REFERENCES agence(id) ON DELETE
     SET NULL
 );

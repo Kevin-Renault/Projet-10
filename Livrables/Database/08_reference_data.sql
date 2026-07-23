@@ -1,4 +1,8 @@
 -- 08_reference_data.sql
+-- SAFE CLEAN BLOCK
+-- Truncate reference data before re-inserting to ensure idempotence
+TRUNCATE TABLE vehicle_feature_catalog,
+currency RESTART IDENTITY CASCADE;
 -- EN: Initial reference data for the database.
 -- FR: Donnees de reference initiales de la base.
 INSERT INTO currency (code, name)

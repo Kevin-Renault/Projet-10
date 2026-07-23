@@ -17,6 +17,10 @@
         @if (!isAgent && currentChat.status !== 'closed') {
         <button type="button" class="close-chat-button" (click)="closeChat()">Clôturer</button>
         }
+        @if (isAgent && currentChat.status === 'assigned' && currentChat.assignedAgentId === currentUserId) {
+        <button type="button" class="close-chat-button" (click)="releaseChat()"
+            [disabled]="isLoading()">Libérer</button>
+        }
     </header>
 
     <section class="chat-layout">

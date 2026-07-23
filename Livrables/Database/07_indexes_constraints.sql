@@ -1,4 +1,12 @@
 -- 07_indexes_constraints.sql
+-- SAFE DROP BLOCK
+-- Drop indexes created by this file
+DROP INDEX IF EXISTS ux_agence_uuid;
+DROP INDEX IF EXISTS ux_user_uuid;
+DROP INDEX IF EXISTS ux_booking_uuid;
+DROP INDEX IF EXISTS ux_chat_uuid;
+DROP INDEX IF EXISTS ux_payment_provider_payment;
+DROP INDEX IF EXISTS ux_webhook_provider_event;
 -- EN: Additional unique indexes and constraints for public UUIDs and idempotency
 -- FR: Indexes uniques et contraintes supplémentaires pour UUID publiques et idempotence
 -- Public UUID uniqueness indexes (explicit)

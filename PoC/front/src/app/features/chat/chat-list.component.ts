@@ -91,6 +91,14 @@ export class ChatListComponent extends CommonComponent {
         this.chatDataSource.release(chatId).subscribe(() => this.setAgentFilter(this.agentFilter()));
     }
 
+    isAssignedToCurrentAgent(chat: Chat): boolean {
+        return chat.status === 'assigned' && chat.assignedAgentId === this.authDataSource.getCurrentUser().id;
+    }
+
+    isAssignedToAnotherAgent(chat: Chat): boolean {
+        return chat.status === 'assigned' && !this.isAssignedToCurrentAgent(chat);
+    }
+
     agentCount(filter: AgentChatFilter): number {
         return this.agentCounts()[filter];
     }
@@ -104,6 +112,7 @@ export class ChatListComponent extends CommonComponent {
 
     activateAgentChat(chat: Chat, event: Event): void {
         if ((event.target as HTMLElement).closest('button')) return;
+        if (this.isAssignedToAnotherAgent(chat)) return;
         if (chat.status === 'open' || chat.status === 'waiting_reassignment') {
             this.claimChat(chat.id);
         } else {

@@ -1,4 +1,14 @@
 -- 06_triggers_and_functions.sql
+-- SAFE DROP BLOCK
+-- Remove triggers and functions created in this file
+DROP TRIGGER IF EXISTS trg_validate_acriss_vehicle_seats ON vehicle;
+DO $$ BEGIN -- Attempt to drop any generated trg_set_updated_at_% triggers if present
+PERFORM 1;
+EXCEPTION
+WHEN others THEN NULL;
+END $$;
+DROP FUNCTION IF EXISTS validate_acriss_vehicle_seats() CASCADE;
+DROP FUNCTION IF EXISTS set_updated_at_column() CASCADE;
 -- EN: Functions and triggers (updated_at auto-set)
 -- FR: Fonctions et triggers (mise à jour automatique de updated_at)
 CREATE OR REPLACE FUNCTION set_updated_at_column() RETURNS trigger AS $$ BEGIN NEW.updated_at = now();
@@ -71,13 +81,16 @@ UPDATE OF acriss_code,
 -- Attach the trigger to tables that have `updated_at` column
 DO $$
 DECLARE tbl TEXT;
-BEGIN FOR tbl IN ARRAY ['vehicle','booking','payment','webhook_event','chat','chat_text','refresh_token'] LOOP EXECUTE format(
-    'DROP TRIGGER IF EXISTS trg_set_updated_at_%s ON %s;',
-    tbl,
-    tbl
-);
+BEGIN FOR tbl IN
+SELECT unnest(
+        ARRAY ['vehicle','booking','payment','webhook_event','chat','chat_text','refresh_token']
+    ) LOOP EXECUTE format(
+        'DROP TRIGGER IF EXISTS trg_set_updated_at_%s ON %I;',
+        tbl,
+        tbl
+    );
 EXECUTE format(
-    'CREATE TRIGGER trg_set_updated_at_%s BEFORE UPDATE ON %s FOR EACH ROW EXECUTE PROCEDURE set_updated_at_column();',
+    'CREATE TRIGGER trg_set_updated_at_%s BEFORE UPDATE ON %I FOR EACH ROW EXECUTE PROCEDURE set_updated_at_column();',
     tbl,
     tbl
 );

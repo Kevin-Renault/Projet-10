@@ -1,4 +1,15 @@
 -- 05_chat.sql
+-- SAFE DROP BLOCK
+-- Drop chat objects in dependency order
+DROP TABLE IF EXISTS chat_text_read CASCADE;
+DROP TABLE IF EXISTS chat_text_attachment_metadata CASCADE;
+DROP TABLE IF EXISTS chat_text_attachment CASCADE;
+DROP TABLE IF EXISTS chat_text_metadata CASCADE;
+DROP TABLE IF EXISTS chat_text CASCADE;
+DROP TABLE IF EXISTS chat_participant_metadata CASCADE;
+DROP TABLE IF EXISTS chat_participant CASCADE;
+DROP TABLE IF EXISTS chat_metadata CASCADE;
+DROP TABLE IF EXISTS chat CASCADE;
 -- EN: Chat PoC tables: conversations, participants, messages, attachments, read receipts
 -- FR: Tchat PoC : conversations, participants, messages, pièces jointes, accusés de lecture
 CREATE TABLE IF NOT EXISTS chat (

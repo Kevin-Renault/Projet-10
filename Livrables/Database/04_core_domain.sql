@@ -1,4 +1,21 @@
 -- 04_core_domain.sql
+-- SAFE DROP BLOCK
+-- Drop dependent views and tables in an order that respects FK dependencies
+-- Run this block first to clean the schema before (re)creating objects below.
+DROP VIEW IF EXISTS vehicle_acriss_details CASCADE;
+DROP TABLE IF EXISTS vehicle_feature CASCADE;
+DROP TABLE IF EXISTS vehicle_photo CASCADE;
+DROP TABLE IF EXISTS payment_metadata CASCADE;
+DROP TABLE IF EXISTS webhook_event_payload CASCADE;
+DROP TABLE IF EXISTS webhook_event_header CASCADE;
+DROP TABLE IF EXISTS webhook_event CASCADE;
+DROP TABLE IF EXISTS payment CASCADE;
+DROP TABLE IF EXISTS booking CASCADE;
+DROP TABLE IF EXISTS offer CASCADE;
+DROP TABLE IF EXISTS vehicle_feature_catalog CASCADE;
+DROP TABLE IF EXISTS vehicle CASCADE;
+DROP TABLE IF EXISTS refund_policy CASCADE;
+DROP TABLE IF EXISTS currency CASCADE;
 -- EN: Core domain objects: agencies, vehicles, bookings, payments, webhooks.
 -- FR: Domaine principal : agences, véhicules, réservations, paiements, webhooks.
 -- VEHICLES

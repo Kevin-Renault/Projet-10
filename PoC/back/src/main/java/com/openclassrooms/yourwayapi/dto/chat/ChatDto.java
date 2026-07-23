@@ -4,5 +4,5 @@ import java.time.Instant;
 import java.util.UUID;
 
 public record ChatDto(Long id, UUID chatUuid, String subject, Long bookingId, Long createdBy,
-        String status, Instant createdAt, Instant updatedAt) {
+                String status, Long assignedAgentId, Instant createdAt, Instant updatedAt) {
 }

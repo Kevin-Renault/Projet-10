@@ -1,4 +1,7 @@
 .venv/
+/Contexte/
+/trash/
+/Source/
 
 # IDE and local tooling
 .vscode/*.log
@@ -30,3 +33,4 @@ PoC/**/application-local.properties
 *.tmp
 Thumbs.db
 Desktop.ini
+trash/Proposition-Architecture.md.save
