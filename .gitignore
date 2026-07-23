@@ -1,5 +1,7 @@
 .venv/
 /Contexte/
+/trash/
+/Source/
 
 # IDE and local tooling
 .vscode/*.log
