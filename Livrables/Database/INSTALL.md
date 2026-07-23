@@ -15,6 +15,7 @@ FR
 Notes:
 - `gen_random_uuid()` requires `pgcrypto`.
 - If you cannot create extensions, ask your DBA to run step 1, then continue with the rest.
-- `apply_all.ps1` is a destructive initialization script: several SQL files use `DROP ... CASCADE`. Do not run it against a database containing data; use versioned migrations for upgrades.
+- `apply_all.ps1` is a destructive initialization script: several SQL files use `DROP ... CASCADE`. Do not run it against a database containing data.
+- Replacing these scripts with versioned migrations is a later task. It requires a prior audit of the existing schema, data, dependencies, deployment environments and rollback requirements; no migration strategy is prescribed here without that audit.
 - The SQL files are not a complete replay-safe migration history. In particular, some `ALTER TABLE ... ADD CONSTRAINT` statements are not guarded by existence checks.
 - For production, prefer using migration tools such as Flyway or Liquibase instead of raw SQL files.
