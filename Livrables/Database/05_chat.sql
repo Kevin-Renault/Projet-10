@@ -67,7 +67,6 @@ CREATE TABLE IF NOT EXISTS chat_text (
     status chat_text_status_type DEFAULT 'sent',
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now(),
-    UNIQUE (chat_text_uuid),
     FOREIGN KEY (chat_id) REFERENCES chat(id) ON DELETE CASCADE,
     FOREIGN KEY (sender_id) REFERENCES ycyw_user(id) ON DELETE
     SET NULL

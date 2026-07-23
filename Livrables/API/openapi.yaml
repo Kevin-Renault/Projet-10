@@ -601,7 +601,7 @@ paths:
     delete:
       tags: [Target platform]
       summary: Cancel a reservation
-      description: 'Refund depends on the time before the reservation starts: 100% above 7 days, 25% below 7 days, and 0% below 48 hours.'
+      description: 'Refund depends on the time before the reservation starts: 100% more than 7 days before, 25% less than 7 days and at least 48 hours before, and 0% less than 48 hours before. Exact boundary behavior must follow the published business policy.'
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - $ref: '#/components/parameters/ReservationId'
@@ -929,11 +929,14 @@ components:
         currency: { type: string, minLength: 3, maxLength: 3 }
     ReservationCancellation:
       type: object
-      required: [reservation, refundPercentage, refundAmount]
+      required: [reservation, refundPercentage, refundAmount, refundCurrency, refundStatus]
       properties:
         reservation: { $ref: '#/components/schemas/Reservation' }
         refundPercentage: { type: integer, enum: [0, 25, 100] }
         refundAmount: { type: number, format: float, minimum: 0 }
+        refundCurrency: { type: string, minLength: 3, maxLength: 3 }
+        refundStatus: { type: string, enum: [not_refunded, pending, processed, failed] }
+        refundPolicyCode: { type: string, maxLength: 50, description: Reference code of the policy applied to the cancellation. }
     PaymentWebhook:
       type: object
       required: [event_id, type, data]

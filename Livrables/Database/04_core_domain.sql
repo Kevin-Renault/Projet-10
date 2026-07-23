@@ -46,7 +46,6 @@ CREATE TABLE IF NOT EXISTS vehicle (
         acriss_code IS NULL
         OR acriss_code ~ '^[A-Z0-9]{4}$'
     ),
-    UNIQUE (vehicle_uuid),
     FOREIGN KEY (owner_agence_id) REFERENCES agence(id) ON DELETE
     SET NULL,
         FOREIGN KEY (current_agence_id) REFERENCES agence(id) ON DELETE
