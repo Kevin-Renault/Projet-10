@@ -669,11 +669,13 @@ paths:
     post:
       tags: [Target platform]
       summary: Receive a payment webhook
-      description: Target-platform contract; not implemented by the chat PoC.
+      description: >-
+        Target-platform contract; not implemented by the chat PoC. The endpoint
+        accepts a provider webhook and normalizes it internally. Provider-specific
+        headers, signature verification, event names and payloads must be defined
+        after studying the official Stripe and PayPal APIs and selecting the
+        provider versions for the target implementation.
       security: []
-      parameters:
-        - $ref: '#/components/parameters/WebhookTimestamp'
-        - $ref: '#/components/parameters/WebhookSignature'
       requestBody:
         required: true
         content:
@@ -723,16 +725,6 @@ components:
       schema: { type: string, format: uuid }
     CsrfHeader:
       name: X-XSRF-TOKEN
-      in: header
-      required: true
-      schema: { type: string }
-    WebhookTimestamp:
-      name: X-WC-Timestamp
-      in: header
-      required: true
-      schema: { type: integer, format: int64 }
-    WebhookSignature:
-      name: X-WC-Signature
       in: header
       required: true
       schema: { type: string }
@@ -941,7 +933,7 @@ components:
       type: object
       required: [event_id, type, data]
       properties:
-        event_id: { type: string }
-        type: { type: string }
-        created: { type: integer, format: int64 }
-        data: { type: object, additionalProperties: true }
+        event_id: { type: string, description: Provider event identifier; provider-specific naming may differ. }
+        type: { type: string, description: Provider event type before internal normalization. }
+        created: { type: integer, format: int64, description: Provider event timestamp when available. }
+        data: { type: object, additionalProperties: true, description: Provider payload before internal normalization. }

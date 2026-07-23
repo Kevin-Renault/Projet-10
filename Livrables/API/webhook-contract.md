@@ -1,30 +1,50 @@
-# Contrat Webhook - Paiements (ébauche)
+# Contrat Webhook - Paiements (cadre cible)
 
 Endpoint
 - `POST /webhooks/payments`
 
 Sécurité
-- Header `X-WC-Timestamp`: unix timestamp (seconds)
-- Header `X-WC-Signature`: `t=<timestamp>,v1=<hex(HMAC-SHA256(secret, timestamp + '.' + payload))>`
-- Secret partagé configuré en variable d'environnement.
+- La requête doit être authentifiée selon le mécanisme officiel du fournisseur.
+- Les noms des headers, le calcul de signature, la tolérance d'horodatage et la gestion des secrets restent à définir après l'étude de Stripe et PayPal.
+- Les secrets sont stockés dans un gestionnaire de secrets ou dans la configuration sécurisée de l'environnement, jamais dans le dépôt.
 
-Payload
-- JSON contenant au minimum :
-  - `event_id` (string) — identifiant unique de l'événement
-  - `type` (string) — ex: `payment_intent.succeeded`
-  - `data` (object) — détails (reservationId, amount, currency)
+Format interne normalisé
+- Chaque adaptateur fournisseur transforme le webhook reçu vers une enveloppe interne commune contenant au minimum :
+  - `provider` (string) — fournisseur d'origine
+  - `provider_event_id` (string) — identifiant fourni par le fournisseur
+  - `event_type` (string) — type métier normalisé
+  - `received_at` (ISO 8601) — date de réception par la plateforme
+  - `data` (object) — données métier utiles, par exemple réservation, paiement, montant et devise
+- Le payload original et les headers utiles peuvent être conservés séparément pour audit technique pendant la durée définie ci-dessous.
+- Les noms d'événements et la structure des payloads propres à Stripe et PayPal ne sont pas figés dans ce contrat générique.
 
 Idempotence
-- Conserver `event_id` traité pendant 7 jours.
+- Dédupliquer avec le couple `(provider, provider_event_id)`.
+- Un événement déjà traité ne doit pas déclencher une seconde mise à jour métier.
+- Conserver l'identifiant et le résultat de traitement pendant au moins 7 jours afin de couvrir les nouvelles tentatives du fournisseur.
+
+Purge et conservation
+- Après 7 jours, supprimer ou archiver les données techniques du webhook selon la politique de conservation retenue.
+- La purge ne doit pas supprimer les données métier nécessaires à l'historique du paiement ou de la réservation.
+- La tâche de purge doit être planifiée, observable et rejouable sans retraiter les événements supprimés.
 
 Retry policy
-- Fournisseur doit renvoyer l'événement jusqu'à 3 tentatives si réponse ≠ 200 (backoff exponentiel: 1m, 5m, 30m).
+- Les règles de nouvelle tentative dépendent du fournisseur et seront précisées dans les contrats d'intégration définitifs.
+- La plateforme doit répondre rapidement après validation et enregistrement de l'événement, sans exécuter un traitement métier long dans la requête HTTP.
 
-Validation
-- Vérifier timestamp (tolérance ±5 minutes).
-- Vérifier signature HMAC.
+Traitement commun
+- Vérifier l'authenticité selon le mécanisme du fournisseur avant tout traitement métier.
+- Enregistrer l'événement et son statut de traitement.
+- Associer l'événement au paiement ou à la réservation lorsque l'information est disponible.
+- Normaliser le résultat vers les statuts internes de paiement et de remboursement.
 
-Actions
-- ACK (200) -> marquer comme traité.
-- NACK (4xx) -> ne pas réessayer (erreur du payload).
-- 5xx -> accepter réessais du fournisseur.
+Réponses
+- Répondre avec un succès après validation et enregistrement idempotent de l'événement.
+- Utiliser une erreur client pour un payload invalide ou une authentification impossible, selon les règles du fournisseur.
+- Utiliser une erreur serveur uniquement lorsqu'une nouvelle tentative est souhaitable.
+
+Étude ultérieure obligatoire
+- Étudier les documentations officielles et les versions d'API de Stripe et PayPal avant l'implémentation.
+- Choisir le ou les fournisseurs retenus pour la première livraison.
+- Définir ensuite, pour chaque fournisseur, les événements pris en charge, les payloads, la vérification de signature, les règles de retry et les codes de réponse.
+- Publier enfin les contrats d'intégration définitifs et adapter l'enveloppe interne normalisée si nécessaire.
