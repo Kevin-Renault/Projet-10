@@ -107,7 +107,7 @@ Cette section décrit l'état final visé après la migration. Les applications 
 - **Accès et répartition :** Un reverse proxy / API Gateway est retenu comme point d'entrée HTTPS pour protéger les conteneurs internes, router les requêtes et répartir la charge vers les instances frontend et backend disponibles.
 - **Traitements asynchrones :** RabbitMQ est retenu pour découpler les traitements asynchrones de l'API. La file permet d'absorber les pics, de réessayer les tâches en erreur et de faire évoluer le nombre de workers indépendamment du nombre d'instances API.
 - **Authentification et sécurité :** Les JWT à courte durée de vie, les refresh tokens et le stockage des secrets dans un vault sont retenus pour sécuriser les accès et limiter l'exposition des informations sensibles.
-- **Paiement :** Stripe et PayPal sont retenus comme fournisseurs de paiement externalisé complémentaires. Stripe permet notamment le paiement par carte bancaire et la gestion de moyens de paiement numériques via une intégration structurée, tandis que PayPal répond aux utilisateurs souhaitant payer depuis leur portefeuille PayPal. Les deux solutions fournissent des APIs, des SDKs et des mécanismes de notification permettant de confirmer les paiements sans stocker les numéros de carte dans l'application.
+- **Paiement :** Stripe et PayPal sont retenus comme fournisseurs de paiement externalisé complémentaires. Stripe permet notamment le paiement par carte bancaire et la gestion de moyens de paiement numériques via une intégration structurée, tandis que PayPal répond aux utilisateurs souhaitant payer depuis leur portefeuille PayPal. Les deux solutions fournissent des APIs, des SDKs et des mécanismes de notification permettant de confirmer les paiements sans stocker les numéros de carte dans l'application. Pour PayPal, le cadrage s'appuie sur Orders v2, Payments v2 et Webhooks Management v1 ; le périmètre exact des APIs et événements sera confirmé lors du choix du flux de première livraison.
 - **Déploiement :** Les conteneurs Docker orchestrés par Kubernetes ou exécutés sur App Services, avec une chaîne CI/CD GitHub Actions, permettent de déployer et de faire évoluer les composants de manière reproductible.
 - **Observabilité :** Prometheus, Grafana, les logs centralisés et OpenTelemetry sont retenus pour suivre séparément les performances de l'API, la consommation de la file, les traitements des workers et les erreurs de l'ensemble de la plateforme.
 
@@ -116,9 +116,50 @@ Cette section décrit l'état final visé après la migration. Les applications 
 #### 2.2.1 Paiement et notifications
 
 - Le backend transmet uniquement les données nécessaires aux fournisseurs de paiement ; le frontend ne les appelle pas directement et aucune donnée bancaire sensible n'est stockée.
-- Les webhooks entrants sont vérifiés par signature et horodatage, puis dédupliqués avec le couple fournisseur / identifiant d'événement.
+- Chaque fournisseur est intégré derrière un adaptateur dédié qui traduit ses événements vers l'enveloppe interne normalisée définie dans le contrat webhook.
+- Pour PayPal, l'adaptateur prend en charge les notifications du flux retenu parmi Orders v2 / Payments v2, notamment les événements d'autorisation, de capture et de remboursement. Les événements sont identifiés par leur `event_type` et leur identifiant d'événement ; la ressource PayPal embarquée et sa version sont conservées pour permettre le rapprochement avec le paiement interne.
+- Le périmètre PayPal initial à étudier couvre `PAYMENT.AUTHORIZATION.CREATED`, `PAYMENT.AUTHORIZATION.VOIDED`, `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.DECLINED`, `PAYMENT.CAPTURE.PENDING`, `PAYMENT.CAPTURE.REFUNDED`, `PAYMENT.CAPTURE.REVERSED`, `PAYMENT.REFUND.PENDING` et `PAYMENT.REFUND.FAILED`. `CHECKOUT.ORDER.APPROVED` peut être utilisé pour suivre l'approbation du parcours Orders v2, mais ne constitue pas à lui seul une confirmation de paiement capturé.
+- Pour PayPal, l'authenticité est vérifiée à partir des informations de transmission fournies par PayPal, notamment l'identifiant de transmission, l'heure de transmission, l'URL du certificat, l'algorithme et la signature, ainsi que l'identifiant du webhook configuré. La vérification peut être effectuée localement avec le certificat PayPal ou via l'endpoint officiel de vérification ; le corps HTTP brut est conservé pour éviter une altération du contenu signé.
+- Les webhooks entrants sont vérifiés par le mécanisme propre à chaque fournisseur, puis dédupliqués avec le couple fournisseur / identifiant d'événement.
+- Après vérification et enregistrement idempotent en base, l'API répond rapidement par un statut `2xx` ; la mise à jour métier et les traitements rejouables sont exécutés de manière asynchrone par RabbitMQ et les workers. Les nouvelles tentatives du fournisseur ne doivent donc pas provoquer de double traitement.
+- Les événements invalides, non authentifiables ou non pris en charge sont rejetés ou classés sans effet métier, avec une journalisation technique ne contenant aucun secret.
 - Les erreurs du fournisseur sont journalisées sans secret, conservées dans un état métier cohérent et présentées à l'utilisateur avec un message compréhensible.
 - Les clés et jetons sont fournis par des variables d'environnement ou un gestionnaire de secrets, jamais par le code source.
+
+##### Séquence de réception et de vérification d’un webhook
+
+Cette séquence détaille le traitement technique commun aux fournisseurs. La vérification d'authenticité reste spécifique à chaque adaptateur ; l'enregistrement idempotent précède les traitements métier asynchrones.
+
+```mermaid
+sequenceDiagram
+  participant Provider as Fournisseur de paiement
+  participant API as Endpoint webhook
+  participant Adapter as Adaptateur fournisseur
+  participant DB as PostgreSQL
+  participant Queue as RabbitMQ
+  participant Worker as Worker métier
+
+  Provider->>API: POST webhook avec corps brut et métadonnées
+  API->>Adapter: Vérifier l'authenticité du message
+  alt Message invalide ou non pris en charge
+    Adapter-->>API: Rejet technique sans effet métier
+    API-->>Provider: Réponse d'erreur ou classement technique
+  else Message valide
+    Adapter-->>API: Enveloppe normalisée
+    API->>DB: Rechercher (provider, provider_event_id)
+    alt Événement déjà enregistré
+      DB-->>API: Doublon détecté
+      API-->>Provider: 2xx sans second traitement
+    else Nouvel événement
+      API->>DB: Enregistrer l'événement et le corps brut
+      DB-->>API: Événement enregistré
+      API->>Queue: Publier le traitement métier
+      API-->>Provider: 2xx après persistance
+      Queue->>Worker: Consommer l'événement
+      Worker->>DB: Mettre à jour paiement et réservation
+    end
+  end
+```
 
 #### 2.2.2 Sobriété numérique et impact écologique
 
@@ -227,6 +268,39 @@ flowchart LR
   API --> Domain[Services métier]
   Domain --> DB[(PostgreSQL)]
   Gateway -->|Routage API| API
+```
+
+#### Séquence fonctionnelle d’une réservation avec paiement externe
+
+Cette vue complète le flux applicatif en montrant l'ordre métier d'une réservation, depuis la sélection de l'offre jusqu'à la confirmation reçue du fournisseur de paiement.
+
+```mermaid
+sequenceDiagram
+  participant Client as Client web
+  participant Frontend as Frontend Angular
+  participant API as API Spring Boot
+  participant Provider as Fournisseur de paiement
+  participant DB as PostgreSQL
+  participant Queue as RabbitMQ
+  participant Worker as Worker métier
+
+  Client->>Frontend: Rechercher et sélectionner une offre
+  Frontend->>API: Créer la réservation
+  API->>DB: Enregistrer la réservation pending
+  API->>Provider: Initialiser le paiement
+  Provider-->>API: Retourner l'identifiant du paiement
+  API-->>Frontend: Retourner le parcours de paiement
+  Frontend-->>Client: Afficher le paiement externe
+  Client->>Provider: Valider le paiement
+  Provider-->>API: Envoyer le webhook de confirmation
+  API->>DB: Enregistrer l'événement de façon idempotente
+  API->>Queue: Publier la confirmation
+  API-->>Provider: Répondre 2xx
+  Queue->>Worker: Consommer la confirmation
+  Worker->>DB: Confirmer le paiement et la réservation
+  Frontend->>API: Consulter l'état de la réservation
+  API-->>Frontend: Retourner l'état à jour
+  Frontend-->>Client: Afficher la confirmation
 ```
 
 ### 2.6 Modèle de données
@@ -641,7 +715,7 @@ Les solutions suivantes sont connues et techniquement envisageables, mais elles 
 
 - OpenAPI 3.0 pour endpoints publics et internes.
 - Payloads JSON, dates en ISO8601 UTC, devises en ISO 4217.
-- Webhook contract: header de signature HMAC-SHA256, timestamp, idempotency via `event_id`.
+- Webhook contract: authentification et signature propres à chaque fournisseur, horodatage lorsque le fournisseur en fournit un, enveloppe interne normalisée et idempotence via le couple `provider` / `provider_event_id`.
 
 ## 5. PoC actuelle
 

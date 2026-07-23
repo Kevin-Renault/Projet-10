@@ -44,6 +44,7 @@ Règles générales : identifiants en UUIDv4, timestamps ISO8601, formats JSON (
 - Paiement
   - Initier un paiement via un fournisseur externe (Stripe/PayPal) et recevoir confirmation via webhook.
   - Ne pas stocker les numéros de carte en clair.
+  - Pour un fournisseur retenu, limiter les notifications souscrites aux événements nécessaires au cycle de vie du paiement et du remboursement.
 
 - Historique
   - L'utilisateur peut consulter ses réservations passées et en cours.
@@ -167,6 +168,33 @@ En tant que client disposant d’une réservation, je veux annuler ma réservati
 - Étant donné une réservation, quand le client l’annule **à 7 jours ou plus de son début**, alors le remboursement est de **100%**.
 - Étant donné une réservation, quand le client l’annule **à moins de 7 jours de son début**, alors le remboursement est limité à **25%** du montant total.
 
+#### **Cycle de vie fonctionnel d’une réservation**
+
+Le parcours ci-dessous synthétise les principaux états d’une réservation et les règles associées au paiement, à la modification et à l’annulation. Les statuts de paiement et de remboursement peuvent évoluer indépendamment du statut de la réservation.
+
+```mermaid
+stateDiagram-v2
+  [*] --> pending : réservation créée
+  pending --> confirmed : paiement confirmé
+  pending --> cancelled : paiement échoué ou expiration
+  confirmed --> modified : modification > 48 h avant le début
+  modified --> confirmed : modification enregistrée
+  confirmed --> cancelled : annulation demandée
+  cancelled --> [*]
+  confirmed --> completed : location terminée
+  completed --> [*]
+
+  state cancelled {
+    [*] --> refund_pending : remboursement demandé
+    refund_pending --> refunded_100 : annulation à 7 jours ou plus
+    refund_pending --> refunded_25 : annulation à moins de 7 jours
+    refunded_100 --> [*]
+    refunded_25 --> [*]
+  }
+```
+
+Ce schéma est une vue fonctionnelle simplifiée : une demande de modification à moins de 48 heures est refusée et ne change pas l’état de la réservation.
+
 ---
 ### **3. Intégration avec les applications d’agence**
 
@@ -198,6 +226,10 @@ En tant qu’utilisateur de l’application, je veux que les échanges avec les 
 - Étant donné un client qui valide un paiement, quand l’application sollicite le fournisseur externe, alors seules les données nécessaires sont transmises et aucune donnée bancaire sensible n’est stockée par l’application.
 - Étant donné un événement reçu d’un fournisseur externe, quand le webhook est transmis à l’API, alors sa signature et son horodatage sont vérifiés avant tout traitement.
 - Étant donné un événement déjà traité, quand le même webhook est reçu plusieurs fois, alors il n’est pas traité une seconde fois et son identifiant est conservé pour assurer l’idempotence.
+- Étant donné un webhook valide, quand l’événement est reçu, alors il est enregistré de manière idempotente avant le traitement métier long et l’API répond par un statut de succès afin de limiter les nouvelles tentatives du fournisseur.
+- Étant donné un webhook invalide ou non authentifiable, quand l’API le reçoit, alors aucune mise à jour métier n’est exécutée et l’événement est journalisé sans exposer de secret.
+- Étant donné un webhook PayPal lorsque PayPal est retenu, quand l’API reçoit une notification, alors elle conserve le corps brut et les éléments nécessaires à la vérification PayPal, notamment l’identifiant du webhook et les informations de transmission, avant toute désérialisation métier.
+- Étant donné un webhook PayPal lorsque le flux Orders v2 / Payments v2 est retenu, alors les événements pris en charge sont explicitement définis parmi les événements d’autorisation, de capture et de remboursement nécessaires au parcours ; les autres événements ne sont pas traités implicitement.
 - Étant donné une erreur ou une indisponibilité du fournisseur externe, quand l’échange échoue, alors l’application conserve un état cohérent, journalise l’erreur et informe l’utilisateur avec un message compréhensible.
 - Étant donné un échange avec un service tiers, quand une clé, un secret ou un jeton est nécessaire, alors cette donnée n’est pas exposée dans le code source, les réponses API ou les journaux applicatifs.
 
