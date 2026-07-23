@@ -19,6 +19,7 @@ paths:
     get:
       tags: [Authentication]
       summary: Get a CSRF token
+      security: []
       responses:
         '204':
           description: CSRF token issued
@@ -29,6 +30,7 @@ paths:
     post:
       tags: [Authentication]
       summary: Register a user
+      security: []
       parameters: [{ $ref: '#/components/parameters/CsrfHeader' }]
       requestBody:
         required: true
@@ -47,6 +49,7 @@ paths:
     post:
       tags: [Authentication]
       summary: Authenticate a user
+      security: []
       parameters: [{ $ref: '#/components/parameters/CsrfHeader' }]
       requestBody:
         required: true
@@ -102,6 +105,7 @@ paths:
       tags: [Target platform]
       summary: Get the runtime environment
       description: Public diagnostic endpoint exposed by the PoC.
+      security: []
       responses:
         '200':
           description: Runtime environment information
@@ -411,6 +415,7 @@ paths:
       tags: [Target platform]
       summary: Receive a payment webhook
       description: Target-platform contract; not implemented by the chat PoC.
+      security: []
       parameters:
         - $ref: '#/components/parameters/WebhookTimestamp'
         - $ref: '#/components/parameters/WebhookSignature'

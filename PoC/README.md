@@ -259,6 +259,83 @@ Les routes d'authentification utilisées par le frontend sont exposées sous `/a
 
 Les requêtes modifiantes utilisent les cookies d'authentification et le header CSRF géré par le frontend. Les cookies ne sont pas lus directement par le code Angular.
 
+### Contrat OpenAPI (`openapi.yaml`)
+
+Le fichier [`openapi.yaml`](openapi.yaml) est le contrat versionné de l'API au format OpenAPI 3.0.3. Il décrit les échanges attendus entre le frontend, le backend et les futurs clients ou systèmes tiers :
+
+- les routes, leur méthode HTTP et leur rôle métier dans `paths` ;
+- les paramètres de chemin, de requête et les headers ;
+- les corps JSON attendus et les réponses possibles ;
+- les modèles de données réutilisables dans `components.schemas` ;
+- les mécanismes d'authentification dans `components.securitySchemes` ;
+- les flux temps réel du tchat avec le type `text/event-stream` pour SSE.
+
+#### Comment lire le fichier
+
+La lecture se fait du général vers le détail :
+
+1. `openapi` indique la version de la norme utilisée ;
+2. `info.version` indique la version du contrat, actuellement `1.1.1` ;
+3. `servers` indique l'URL de référence de l'API ;
+4. chaque clé de `paths` correspond à une route, puis `get`, `post` ou `put` décrit l'opération ;
+5. `$ref` réutilise un élément défini dans `components`, par exemple un schéma de réponse ou un paramètre commun ;
+6. `security` indique l'authentification nécessaire pour appeler la route :
+   - `security: [{ cookieAuth: [] }]` signifie que le cookie JWT `access_token` est requis ;
+   - `security: [{ bearerAuth: [] }]` signifie qu'un token JWT doit être envoyé dans le header `Authorization: Bearer ...` ;
+   - `security: [{ cookieAuth: [] }, { bearerAuth: [] }]` signifie qu'une des deux méthodes est acceptée ;
+   - `security: []` signifie explicitement que la route est publique et ne nécessite pas de connexion. C'est le cas, par exemple, de la connexion et de l'inscription ;
+7. `security` concerne l'authentification, tandis que le header `X-XSRF-TOKEN` concerne la protection CSRF. Une requête publique peut donc tout de même demander un token CSRF, comme l'inscription et la connexion ;
+8. les requêtes modifiantes utilisent le header `X-XSRF-TOKEN` lorsque le CSRF est requis.
+
+Exemple :
+
+```yaml
+/api/auth/login:
+    post:
+        security: []                 # aucune connexion préalable nécessaire
+        parameters:
+            - $ref: '#/components/parameters/CsrfHeader'
+```
+
+Ici, l'utilisateur n'a pas encore de session, donc la route n'exige ni cookie JWT ni bearer token. En revanche, le header CSRF peut être demandé pour empêcher les requêtes forgées.
+
+Exemple de lecture :
+
+```yaml
+/api/chats/{chatId}/messages:
+    post:
+        requestBody:             # JSON envoyé par le client
+            ...
+        responses:               # réponses possibles du backend
+            '200': ...
+```
+
+Le nom `{chatId}` est un paramètre de chemin. Son type et sa contrainte (`int64`, valeur minimale `1`) sont définis dans `components.parameters.ChatId`. Le corps de la requête est décrit par `SendChatTextRequest`, qui impose un champ `content` de 1 à 10 000 caractères.
+
+#### Fichier statique et documentation générée
+
+`PoC/openapi.yaml` est un fichier documentaire versionné : Spring Boot ne le charge pas automatiquement pour construire les routes et il ne remplace pas les contrôleurs Java. Les routes réelles sont implémentées dans `back/src/main/java/.../controller/`.
+
+Le backend utilise également Springdoc, qui génère une description OpenAPI à partir des contrôleurs et des annotations Java pendant l'exécution :
+
+| Ressource | Utilisation |
+| --- | --- |
+| `http://localhost:8080/swagger-ui.html` | Consulter et tester l'API dans une interface graphique |
+| `http://localhost:8080/v3/api-docs` | Consulter le contrat OpenAPI généré au format JSON |
+| [`openapi.yaml`](openapi.yaml) | Lire, relire et partager le contrat versionné, notamment avant l'implémentation d'un client |
+
+La documentation générée reflète le code exécuté. Le fichier YAML est la référence lisible et versionnée du contrat attendu. Après toute modification d'une route, d'un DTO, d'un mécanisme d'authentification ou d'une réponse, il faut vérifier la cohérence entre le YAML, les contrôleurs Java et la documentation Springdoc. Le YAML ne doit pas être présenté comme une preuve qu'une route cible est déjà implémentée : les routes réservation et paiement y sont documentées pour l'architecture cible, mais restent hors du périmètre de cette PoC.
+
+#### Valider le YAML
+
+Depuis le dossier `PoC`, la validation peut être effectuée avec un validateur OpenAPI :
+
+```powershell
+npx --yes @redocly/cli lint openapi.yaml
+```
+
+Cette commande vérifie la syntaxe YAML, les références `$ref` et la conformité OpenAPI. Elle nécessite Node.js et peut télécharger l'outil lors de la première exécution. Une validation réussie ne remplace pas les tests backend : elle confirme uniquement que le contrat est exploitable par des outils OpenAPI.
+
 ## Tests et build
 
 ### Frontend
