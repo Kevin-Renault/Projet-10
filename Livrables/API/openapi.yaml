@@ -619,7 +619,7 @@ paths:
     get:
       tags: [Target platform]
       summary: List users for an agency application
-      description: Read-only agency integration endpoint.
+      description: Agency integration endpoint.
       security: [{ bearerAuth: [] }]
       responses:
         '200':
@@ -636,7 +636,7 @@ paths:
     get:
       tags: [Target platform]
       summary: List reservations for an agency application
-      description: Read-only agency integration endpoint.
+      description: Agency integration endpoint.
       security: [{ bearerAuth: [] }]
       responses:
         '200':
@@ -653,7 +653,7 @@ paths:
     get:
       tags: [Target platform]
       summary: List vehicles for an agency application
-      description: Read-only agency integration endpoint.
+      description: Agency integration endpoint.
       security: [{ bearerAuth: [] }]
       responses:
         '200':

@@ -17,7 +17,7 @@ Your Car Your Way centralise plusieurs applications nationales hétérogènes. L
 
 ## Périmètre
 
-Inclut : comptes utilisateurs, recherche et réservation de véhicules, paiement via fournisseur externe, consultation historique, gestion basique des agences et véhicules, API pour intégration agence (lecture minimale). Exclut : administration interne avancée, analytics, migration des bases legacy, aspects infra détaillés.
+Inclut : comptes utilisateurs, recherche et réservation de véhicules, paiement via fournisseur externe, consultation historique, gestion basique des agences et véhicules, API pour intégration agence. Exclut : administration interne avancée, analytics, migration des bases legacy, aspects infra détaillés.
 
 ---
 
@@ -53,7 +53,7 @@ Règles générales : identifiants en UUIDv4, timestamps ISO8601, formats JSON (
   - Exposer la classification ACRISS du véhicule et, pour les vans passagers, respecter le codage complémentaire lié au nombre de places.
 
 - API agences
-  - Fournir des endpoints sécurisés en lecture seule pour consultation par les applications d'agence dans le périmètre de la première livraison.
+  - Fournir des endpoints sécurisés pour les applications d'agence dans le périmètre de la première livraison.
 
 ---
 
