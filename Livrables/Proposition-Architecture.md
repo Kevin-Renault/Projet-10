@@ -5,28 +5,27 @@
 1. [Orientation stratégique](#1-orientation-stratégique)
   - [1.1 Audit ciblé des versions existantes](#11-audit-ciblé-des-versions-existantes)
   - [1.2 Critères de décision](#12-critères-de-décision)
-2. [Stratégie de migration](#2-stratégie-de-migration)
-  - [2.1 Principes de migration](#21-principes-de-migration)
-  - [2.2 Étapes de migration](#22-étapes-de-migration)
-  - [2.3 Schémas de coexistence et de migration](#23-schémas-de-coexistence-et-de-migration)
-3. [Technologies retenues](#3-technologies-retenues)
-  - [3.1 Choix technologiques actés](#31-choix-technologiques-actés)
-  - [3.2 Justification des choix](#32-justification-des-choix)
-4. [Intégrations et services tiers](#4-intégrations-et-services-tiers)
-5. [Architecture cible](#5-architecture-cible)
-  - [5.1 Principes d'architecture](#51-principes-darchitecture)
-  - [5.2 Schéma des briques](#52-schéma-des-briques)
-  - [5.3 Flux applicatif](#53-flux-applicatif)
-  - [5.4 Modèle de données](#54-modèle-de-données)
-  - [5.5 Vue UML du domaine](#55-vue-uml-du-domaine)
-6. [Comparaison et justification des choix](#6-comparaison-et-justification-des-choix)
-  - [6.1 Tableau de comparaison](#61-tableau-de-comparaison)
-  - [6.2 Solutions de paiement non retenues](#62-solutions-de-paiement-non-retenues)
-7. [Spécifications transverses](#7-spécifications-transverses)
-  - [7.1 Sécurité, sessions et accessibilité](#71-sécurité-sessions-et-accessibilité)
-  - [7.2 Exigences non fonctionnelles](#72-exigences-non-fonctionnelles)
-  - [7.3 Formats et contrats](#73-formats-et-contrats)
-8. [Prochaines étapes](#8-prochaines-étapes)
+2. [Architecture cible](#2-architecture-cible)
+  - [2.1 Technologies retenues](#21-technologies-retenues)
+  - [2.2 Intégrations et services tiers](#22-intégrations-et-services-tiers)
+  - [2.3 Principes d'architecture](#23-principes-darchitecture)
+  - [2.4 Schéma des briques](#24-schéma-des-briques)
+  - [2.5 Flux applicatif](#25-flux-applicatif)
+  - [2.6 Modèle de données](#26-modèle-de-données)
+  - [2.7 Vue UML du domaine](#27-vue-uml-du-domaine)
+3. [Comparaison et justification des choix](#3-comparaison-et-justification-des-choix)
+  - [3.1 Tableau de comparaison](#31-tableau-de-comparaison)
+  - [3.2 Solutions de paiement non retenues](#32-solutions-de-paiement-non-retenues)
+4. [Spécifications transverses](#4-spécifications-transverses)
+  - [4.1 Sécurité, sessions et accessibilité](#41-sécurité-sessions-et-accessibilité)
+  - [4.2 Exigences non fonctionnelles](#42-exigences-non-fonctionnelles)
+  - [4.3 Formats et contrats](#43-formats-et-contrats)
+5. [PoC actuelle](#5-poc-actuelle)
+6. [Stratégie de migration](#6-stratégie-de-migration)
+  - [6.1 Principes de migration](#61-principes-de-migration)
+  - [6.2 Étapes de migration](#62-étapes-de-migration)
+  - [6.3 Schémas de coexistence et de migration](#63-schémas-de-coexistence-et-de-migration)
+7. [Prochaines étapes](#7-prochaines-étapes)
 
 ## 1. Orientation stratégique
 
@@ -53,70 +52,23 @@ La décision de conserver, adapter ou remplacer une version existante sera prise
 
 La stratégie cible privilégie donc la réutilisation de l'existant lorsqu'elle est démontrée, tout en conservant la possibilité de remplacer les composants qui ne répondent pas aux exigences de la plateforme centralisée.
 
-## 2. Stratégie de migration
+## 2. Architecture cible
 
-### 2.1 Principes de migration
+Cette section décrit l'état final visé après la migration. Les applications historiques, leurs connecteurs et les mécanismes de coexistence sont temporaires : ils sont décrits dans la stratégie de migration et ne constituent pas des dépendances permanentes de la cible.
 
-La migration sera progressive afin de limiter les risques et d'éviter une bascule simultanée de toutes les applications nationales. La nouvelle plateforme sera mise en place à côté des systèmes existants, puis les fonctionnalités seront transférées par étapes selon leur niveau de maturité et les résultats observés.
+### 2.1 Technologies retenues
 
-Une couche d'adaptation temporaire sera placée au plus près des bases et APIs nationales. Elle prendra la forme de connecteurs backend dédiés, chargés de lire les anciens formats, de les traduire vers le modèle de données centralisé et, si nécessaire, de transmettre les écritures selon les règles de chaque système. Le frontend central ne communiquera jamais directement avec ces bases : il passera uniquement par le backend et l'API Gateway. Cette couche ne doit pas devenir une dépendance permanente : chaque connecteur devra être documenté, observé et retiré après la migration du périmètre concerné.
-
-Les données et les flux critiques seront contrôlés pendant la coexistence des systèmes. Chaque vague de migration devra prévoir une validation des données, des tests fonctionnels et de charge, une surveillance renforcée et un plan de retour vers l'ancien système.
-
-### 2.2 Étapes de migration
-
-1. **Préparer la plateforme centrale :** mettre en place l'API Gateway, le frontend et le backend communs, le modèle PostgreSQL, l'authentification, l'observabilité et les contrats d'échange.
-2. **Construire les connecteurs temporaires :** placer un adaptateur au plus près de chaque base ou API nationale afin de traduire les données et les échanges sans exposer les systèmes historiques au frontend ou au backend métier central.
-3. **Piloter avec la version américaine :** auditer puis réutiliser les composants US compatibles avec la cible. Cette version constitue le premier périmètre candidat en raison de ses indicateurs opérationnels favorables ; sa conservation devra être confirmée par l'audit.
-4. **Intégrer les enseignements du frontend canadien :** reprendre les parcours, composants et pratiques UX associés aux retours positifs, après vérification de leur accessibilité et de leur compatibilité avec l'interface centralisée.
-5. **Migrer par vagues fonctionnelles et géographiques :** commencer par les consultations, puis les comptes, les offres, les réservations et enfin les traitements plus sensibles comme les paiements et les remboursements.
-6. **Stabiliser puis décommissionner :** maintenir une période de surveillance, confirmer la qualité des données et les indicateurs de service, puis retirer progressivement les anciens connecteurs et applications.
-
-### 2.3 Schémas de coexistence et de migration
-
-Le premier schéma montre le principe de coexistence temporaire. Le frontend central communique uniquement avec le backend central. Les connecteurs d'adaptation sont placés au plus près des bases et APIs nationales, tandis que les applications nationales continuent de fonctionner pendant la migration.
-
-```mermaid
-flowchart LR
-  Client[Clients] --> Gateway[API Gateway]
-  Gateway --> Frontend[Frontend central]
-  Gateway --> Backend[Backend central]
-  Backend --> Adapter[Couche d'intégration backend temporaire]
-  Adapter --> USAdapter[Connecteur US]
-  Adapter --> CAAdapter[Connecteur Canada]
-  Adapter --> LegacyAdapter[Connecteurs historiques]
-  USAdapter --> USDB[(Base / API US)]
-  CAAdapter --> CADB[(Base / API Canada)]
-  LegacyAdapter --> LegacyDB[(Bases / APIs nationales)]
-  Backend --> CentralDB[(PostgreSQL central)]
-```
-
-Le second schéma présente l'ordre recommandé. La migration est validée à chaque étape avant de poursuivre la vague suivante.
-
-```mermaid
-flowchart LR
-  Audit[Audit US + analyse UX Canada] --> Platform[Plateforme centrale]
-  Platform --> Adapter[Connecteurs temporaires]
-  Adapter --> Pilot[Pilote US]
-  Pilot --> Waves[Migrations par pays et par domaine]
-  Waves --> Validation[Validation données, sécurité et performance]
-  Validation --> Cutover[Bascule progressive]
-  Cutover --> Retirement[Retrait des anciens systèmes]
-```
-
-## 3. Technologies retenues
-
-### 3.1 Choix technologiques actés
+#### 2.1.1 Choix technologiques actés
 
 - **Frontend**
-  - Angular 17 + TypeScript.
+  - Angular 21 + TypeScript.
   - Traduction gérée par les ressources de l'application.
 - **Backend**
   - Java 21 + Spring Boot 3.2.
   - API REST structurée et validation des entrées.
 - **API**
   - REST JSON avec OpenAPI 3.0.
-  - JWT pour les clients et les systèmes intégrés.
+  - JWT pour les utilisateurs web, selon le mode d'authentification retenu.
 - **Base de données et cache**
   - Base SQL.
     - PostgreSQL comme base relationnelle avec schéma normalisé.
@@ -140,7 +92,7 @@ flowchart LR
   - Logs centralisés.
   - Métriques Prometheus visualisées dans Grafana et traces distribuées avec OpenTelemetry.
 
-### 3.2 Justification des choix
+#### 2.1.2 Justification des choix
 
 - **Frontend :** Angular est retenu pour structurer une interface web TypeScript maintenable, compatible avec les exigences d'accessibilité, d'internationalisation et de tests du projet.
 - **Backend :** Spring Boot et Java 21 sont retenus pour structurer une API REST robuste, avec validation des entrées, gestion de la sécurité, prise en charge des transactions métier et outillage de tests adapté.
@@ -159,25 +111,23 @@ flowchart LR
 - **Déploiement :** Les conteneurs Docker orchestrés par Kubernetes ou exécutés sur App Services, avec une chaîne CI/CD GitHub Actions, permettent de déployer et de faire évoluer les composants de manière reproductible.
 - **Observabilité :** Prometheus, Grafana, les logs centralisés et OpenTelemetry sont retenus pour suivre séparément les performances de l'API, la consommation de la file, les traitements des workers et les erreurs de l'ensemble de la plateforme.
 
-## 4. Intégrations et services tiers
+### 2.2 Intégrations et services tiers
 
-### 4.1 Paiement et notifications
+#### 2.2.1 Paiement et notifications
 
 - Le backend transmet uniquement les données nécessaires aux fournisseurs de paiement ; le frontend ne les appelle pas directement et aucune donnée bancaire sensible n'est stockée.
 - Les webhooks entrants sont vérifiés par signature et horodatage, puis dédupliqués avec le couple fournisseur / identifiant d'événement.
 - Les erreurs du fournisseur sont journalisées sans secret, conservées dans un état métier cohérent et présentées à l'utilisateur avec un message compréhensible.
 - Les clés et jetons sont fournis par des variables d'environnement ou un gestionnaire de secrets, jamais par le code source.
 
-### 4.2 Sobriété numérique et impact écologique
+#### 2.2.2 Sobriété numérique et impact écologique
 
 - Les réponses API sont paginées et limitées aux champs nécessaires afin de réduire les échanges réseau.
 - Les images de véhicules sont redimensionnées, compressées et servies dans un format adapté au contexte d'affichage.
 - Les contenus statiques sont mis en cache lorsque cela est pertinent.
 - L'hébergement et les services sont choisis en tenant compte de leur impact environnemental documenté et du dimensionnement réel de la première livraison.
 
-## 5. Architecture cible
-
-### 5.1 Principes d'architecture
+### 2.3 Principes d'architecture
 
 - Le frontend Angular consomme l'API REST Spring Boot via le reverse proxy / API Gateway et HTTPS.
 - Le reverse proxy / API Gateway constitue le point d'entrée HTTPS, effectue le routage et répartit les requêtes vers les instances frontend et backend disponibles.
@@ -185,17 +135,16 @@ flowchart LR
 - Les tâches longues ou rejouables sont publiées dans RabbitMQ puis consommées par des workers indépendants ; le nombre de workers peut évoluer séparément du nombre d'instances API.
 - PostgreSQL est la source de vérité pour les comptes, offres, réservations, paiements, webhooks et données du tchat.
 - Redis sert à accélérer les accès aux données temporaires et ne remplace pas PostgreSQL pour les données métier.
-- Les fournisseurs externes sont appelés uniquement par le backend ; leurs événements entrants passent par le contrat webhook avant mise à jour du domaine.
+- Les fournisseurs de paiement sont appelés uniquement par le backend ; leurs événements entrants passent par le contrat webhook avant mise à jour du domaine. Aucun autre système métier externe n'est une dépendance permanente de la cible.
 
-### 5.2 Schéma des briques
+### 2.4 Schéma des briques
 
 Ce schéma présente une première vue de composition de l'ensemble final. Les blocs portant la mention « conteneur Docker » correspondent aux composants applicatifs déployables et réplicables. PostgreSQL, Redis, RabbitMQ et les outils d'exploitation sont représentés comme des services d'infrastructure ; ils pourront être hébergés en services managés ou déployés en conteneurs selon l'environnement retenu.
 
 ```mermaid
 flowchart TB
-  subgraph Clients[Clients et systèmes appelants]
+  subgraph Clients[Clients]
     Browser[Navigateur web]
-    IntegratedSystem[Systèmes intégrés]
   end
 
   subgraph Platform[Plateforme conteneurisée]
@@ -234,7 +183,6 @@ flowchart TB
   end
 
   Browser -->|HTTPS| Gateway
-  IntegratedSystem -->|HTTPS + JWT| Gateway
   Gateway --> Frontend
   Gateway --> Backend
   Frontend -->|REST JSON| Backend
@@ -261,14 +209,14 @@ flowchart TB
 
   class Gateway,Frontend,Backend,Worker docker
   class Database,Cache,Queue,Logs,Metrics,Traces,Secrets infrastructure
-  class Browser,IntegratedSystem client
+  class Browser client
   class DockerLegend legendDocker
   class InfraLegend legendInfrastructure
   class ClientLegend legendClient
 
 ```
 
-### 5.3 Flux applicatif
+### 2.5 Flux applicatif
 
 ```mermaid
 flowchart LR
@@ -278,13 +226,12 @@ flowchart LR
   API --> Auth[JWT et refresh tokens]
   API --> Domain[Services métier]
   Domain --> DB[(PostgreSQL)]
-  IntegratedSystem[Système intégré] -->|HTTPS + JWT| Gateway
   Gateway -->|Routage API| API
 ```
 
-### 5.4 Modèle de données
+### 2.6 Modèle de données
 
-### 5.4.1 Vue d'ensemble
+#### 2.6.1 Vue d'ensemble
 
 ```mermaid
 erDiagram
@@ -407,7 +354,7 @@ erDiagram
   }
 ```
 
-### 5.4.2 Sous-modèle ACRISS et vue de lecture
+#### 2.6.2 Sous-modèle ACRISS et vue de lecture
 
 Le sous-modèle ACRISS est présenté séparément afin de ne pas alourdir le modèle métier principal. Les tables ACRISS sont des référentiels ; elles ne sont pas reliées par des clés étrangères persistées directement dans `VEHICLE`. Le trigger valide les quatre caractères de `acriss_code`, et la vue reconstruit les informations lisibles par jointure.
 
@@ -472,9 +419,9 @@ erDiagram
 
 `VEHICLE_ACRISS_DETAILS` est une vue de lecture non persistée. Elle reconstruit les libellés ACRISS à partir des quatre positions de `VEHICLE.acriss_code` et applique la règle de capacité des vans passagers sans dupliquer ces données dans `VEHICLE`.
 
-### 5.5 Vue UML du domaine
+### 2.7 Vue UML du domaine
 
-### 5.5.1 Vue d'ensemble
+#### 2.7.1 Vue d'ensemble
 
 ```mermaid
 classDiagram
@@ -579,7 +526,7 @@ classDiagram
   Chat "1" --> "0..*" ChatText
 ```
 
-### 5.5.2 Sous-modèle UML ACRISS et vue de lecture
+#### 2.7.2 Sous-modèle UML ACRISS et vue de lecture
 
 ```mermaid
 classDiagram
@@ -631,9 +578,9 @@ classDiagram
   VehicleAcrissDetails ..> AcrissPassengerVanRule : joins
 ```
 
-## 6. Comparaison et justification des choix
+## 3. Comparaison et justification des choix
 
-### 6.1 Tableau de comparaison
+### 3.1 Tableau de comparaison
 
 | Besoin | Solution retenue | Alternatives considérées | Justification |
 |---|---|---|---|
@@ -649,7 +596,7 @@ classDiagram
 | Observabilité | Prometheus, Grafana, logs centralisés et OpenTelemetry | Fichiers de logs locaux et supervision manuelle | Centralise les logs, mesure les performances et permet de corréler une requête API avec les traitements asynchrones et les erreurs de la plateforme. |
 | Gestion des secrets | Azure Key Vault ou AWS Secrets Manager | Secrets dans le code ou les fichiers d'image Docker | Évite d'exposer les clés, mots de passe et jetons dans le dépôt ou les images ; les secrets sont injectés au runtime selon l'environnement. |
 
-### 6.2 Solutions de paiement non retenues à ce jour
+### 3.2 Solutions de paiement non retenues à ce jour
 
 Les solutions suivantes sont connues et techniquement envisageables, mais elles ne sont pas retenues dans le périmètre actuel :
 
@@ -662,12 +609,12 @@ Les solutions suivantes sont connues et techniquement envisageables, mais elles 
 - **Apple Pay et Google Pay** : moyens de paiement complémentaires et non fournisseurs principaux ; ils pourront être activés ultérieurement via Stripe si le besoin est confirmé.
 - **Virement ou prélèvement SEPA** : non retenus car ils ne garantissent pas nécessairement une confirmation immédiate adaptée à la réservation d'un véhicule.
 
-## 7. Spécifications transverses
+## 4. Spécifications transverses
 
-### 7.1 Sécurité, sessions et accessibilité
+### 4.1 Sécurité, sessions et accessibilité
 
 - Les échanges API utilisent OpenAPI 3.0, JSON, des dates ISO 8601 UTC et des devises ISO 4217.
-- Les accès clients et systèmes intégrés sont authentifiés par JWT ; les droits sont définis selon le contexte métier et le périmètre de chaque intégration.
+- Les utilisateurs web sont authentifiés par JWT ; les droits sont définis selon leur rôle et leur périmètre métier. Les seuls échanges métier externes prévus concernent les fournisseurs de paiement.
 - Le JWT d'accès a une durée de vie courte, fixée à 15 minutes en production. Il peut être transmis dans l'en-tête `Authorization: Bearer` ou, pour les clients web, dans un cookie `access_token` `HttpOnly`, `Secure` et `SameSite=Lax`.
 - Le refresh token est un jeton opaque stocké dans un cookie `HttpOnly`, `Secure` et `SameSite=Lax`, limité au chemin `/api/auth`. Sa durée de vie est de 30 jours en production et sa valeur n'est jamais stockée en clair en base.
 - Chaque renouvellement vérifie le hash du refresh token, supprime le jeton présenté et émet un nouveau refresh token. La déconnexion révoque le refresh token en base et supprime les cookies d'accès et de renouvellement.
@@ -675,7 +622,7 @@ Les solutions suivantes sont connues et techniquement envisageables, mais elles 
 - Les mots de passe, tokens et secrets ne sont jamais stockés en clair ni écrits dans les journaux.
 - Les parcours login, réservation, paiement et profil doivent respecter les critères d'accessibilité du CDC et être vérifiés par axe-core et des tests clavier/lecteur d'écran.
 
-### 7.2 Exigences non fonctionnelles
+### 4.2 Exigences non fonctionnelles
 
 - Disponibilité (SLA cible) : 99.9% (MTBF/MTTR planifiés) — baseline fournie dans `Contexte`.
 - Objectifs d'exploitation (SLO)
@@ -686,13 +633,99 @@ Les solutions suivantes sont connues et techniquement envisageables, mais elles 
   - MTTR objectif: < 1 heure
 - Sécurité: TLS 1.2+ (préférer 1.3), cookies HttpOnly+Secure, rotation automatique des secrets.
 
-### 7.3 Formats et contrats
+### 4.3 Formats et contrats
 
 - OpenAPI 3.0 pour endpoints publics et internes.
 - Payloads JSON, dates en ISO8601 UTC, devises en ISO 4217.
 - Webhook contract: header de signature HMAC-SHA256, timestamp, idempotency via `event_id`.
 
-## 8. Prochaines étapes
+## 5. PoC actuelle
+
+La PoC actuelle valide le parcours fonctionnel du tchat, et non l'ensemble de la plateforme cible. Elle sert de preuve technique pour le dialogue entre un client et un agent, la persistance des conversations et la gestion des droits.
+
+### Périmètre fonctionnel
+
+- création et consultation d'une conversation ;
+- authentification client et agent ;
+- envoi et lecture des messages ;
+- prise en charge d'une conversation par un agent ;
+- libération et reprise d'une conversation ;
+- clôture côté client ;
+- diffusion des messages et changements d'état par SSE ;
+- contrôle des droits côté frontend et backend, notamment pour les conversations attribuées à un autre agent.
+
+### Réalisation technique
+
+| Couche | Réalisation actuelle |
+| --- | --- |
+| Frontend | Angular 21, TypeScript, RxJS, composants autonomes et signaux |
+| Backend | Java 21, Spring Boot 3.2, Spring MVC, Spring Data JPA et Spring Security |
+| Données | PostgreSQL, scripts SQL d'initialisation et entités JPA |
+| Authentification | JWT dans des cookies HttpOnly, refresh token et protection CSRF |
+| Temps réel | SSE avec `SseEmitter` côté backend et `EventSource` côté frontend |
+| Tests | Jest, Cypress, JUnit, tests Spring Boot et Mockito |
+| Exécution locale | Backend sur `localhost:8080`, frontend Angular sur `localhost:4200`, proxy `/api` |
+
+La PoC propose aussi un mode mock Angular pour tester l'interface sans PostgreSQL ni backend. Le détail des commandes, des routes, des comptes de démonstration, des statuts et des scénarios de validation est disponible dans [PoC/README.md](../PoC/README.md).
+
+### Limites par rapport à la cible
+
+La PoC ne réalise pas encore les parcours de réservation, de paiement ou de gestion complète des véhicules. Elle n'intègre pas non plus Redis, RabbitMQ, Docker, Kubernetes, une passerelle API de production ou une chaîne d'observabilité complète. Ces éléments relèvent de la cible ou de son déploiement futur, pas de la preuve fonctionnelle actuelle.
+
+## 6. Stratégie de migration
+
+La stratégie de migration décrit le chemin temporaire permettant d'intégrer les données et l'historique des applications existantes dans la plateforme cible. Les connecteurs, adaptateurs et mécanismes de coexistence présentés ici sont supprimés ou désactivés après la migration et ne font pas partie de l'architecture finale.
+
+### 6.1 Principes de migration
+
+La migration sera progressive afin de limiter les risques et d'éviter une bascule simultanée de toutes les applications nationales. La nouvelle plateforme sera mise en place à côté des systèmes existants, puis les fonctionnalités seront transférées par étapes selon leur niveau de maturité et les résultats observés.
+
+Une couche d'adaptation temporaire sera placée au plus près des bases et APIs nationales. Elle prendra la forme de connecteurs backend dédiés, chargés de lire les anciens formats, de les traduire vers le modèle de données centralisé et, si nécessaire, de transmettre les écritures selon les règles de chaque système. Le frontend central ne communiquera jamais directement avec ces bases : il passera uniquement par le backend et l'API Gateway. Cette couche ne doit pas devenir une dépendance permanente : chaque connecteur devra être documenté, observé et retiré après la migration du périmètre concerné.
+
+Les données et les flux critiques seront contrôlés pendant la coexistence des systèmes. Chaque vague de migration devra prévoir une validation des données, des tests fonctionnels et de charge, une surveillance renforcée et un plan de retour vers l'ancien système.
+
+### 6.2 Étapes de migration
+
+1. **Préparer la plateforme centrale :** mettre en place l'API Gateway, le frontend et le backend communs, le modèle PostgreSQL, l'authentification, l'observabilité et les contrats d'échange.
+2. **Construire les connecteurs temporaires :** placer un adaptateur au plus près de chaque base ou API nationale afin de traduire les données et les échanges sans exposer les systèmes historiques au frontend ou au backend métier central.
+3. **Piloter avec la version américaine :** auditer puis réutiliser les composants US compatibles avec la cible. Cette version constitue le premier périmètre candidat en raison de ses indicateurs opérationnels favorables ; sa conservation devra être confirmée par l'audit.
+4. **Intégrer les enseignements du frontend canadien :** reprendre les parcours, composants et pratiques UX associés aux retours positifs, après vérification de leur accessibilité et de leur compatibilité avec l'interface centralisée.
+5. **Migrer par vagues fonctionnelles et géographiques :** commencer par les consultations, puis les comptes, les offres, les réservations et enfin les traitements plus sensibles comme les paiements et les remboursements.
+6. **Stabiliser puis décommissionner :** maintenir une période de surveillance, confirmer la qualité des données et les indicateurs de service, puis retirer progressivement les anciens connecteurs et applications.
+
+### 6.3 Schémas de coexistence et de migration
+
+Le premier schéma montre le principe de coexistence temporaire. Le frontend central communique uniquement avec le backend central. Les connecteurs d'adaptation sont placés au plus près des bases et APIs nationales, tandis que les applications nationales continuent de fonctionner pendant la migration.
+
+```mermaid
+flowchart LR
+  Client[Clients] --> Gateway[API Gateway]
+  Gateway --> Frontend[Frontend central]
+  Gateway --> Backend[Backend central]
+  Backend --> Adapter[Couche d'intégration backend temporaire]
+  Adapter --> USAdapter[Connecteur US]
+  Adapter --> CAAdapter[Connecteur Canada]
+  Adapter --> LegacyAdapter[Connecteurs historiques]
+  USAdapter --> USDB[(Base / API US)]
+  CAAdapter --> CADB[(Base / API Canada)]
+  LegacyAdapter --> LegacyDB[(Bases / APIs nationales)]
+  Backend --> CentralDB[(PostgreSQL central)]
+```
+
+Le second schéma présente l'ordre recommandé. La migration est validée à chaque étape avant de poursuivre la vague suivante.
+
+```mermaid
+flowchart LR
+  Audit[Audit US + analyse UX Canada] --> Platform[Plateforme centrale]
+  Platform --> Adapter[Connecteurs temporaires]
+  Adapter --> Pilot[Pilote US]
+  Pilot --> Waves[Migrations par pays et par domaine]
+  Waves --> Validation[Validation données, sécurité et performance]
+  Validation --> Cutover[Bascule progressive]
+  Cutover --> Retirement[Retrait des anciens systèmes]
+```
+
+## 7. Prochaines étapes
 
 1. Valider les choix technologiques avec les parties prenantes (compétences, coûts).
 2. Formaliser NFRs chiffrés et dimensionnement par région (RPS, cache, DB replicas).
