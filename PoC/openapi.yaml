@@ -1,0 +1,583 @@
+openapi: 3.0.3
+info:
+  title: Your Car Your Way API
+  version: '1.1.1'
+  description: >-
+    API contract for the target platform and the chat proof of concept.
+    Authentication, users and chat routes are implemented by the PoC.
+    Reservation and payment routes describe the target platform only.
+servers:
+  - url: https://api.yourcaryourway.example.com
+tags:
+  - name: Authentication
+  - name: Users
+  - name: Chat
+  - name: Target platform
+
+paths:
+  /api/auth/csrf:
+    get:
+      tags: [Authentication]
+      summary: Get a CSRF token
+      responses:
+        '204':
+          description: CSRF token issued
+          headers:
+            X-XSRF-TOKEN:
+              schema: { type: string }
+  /api/auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register a user
+      parameters: [{ $ref: '#/components/parameters/CsrfHeader' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '200':
+          description: User registered and authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/auth/login:
+    post:
+      tags: [Authentication]
+      summary: Authenticate a user
+      parameters: [{ $ref: '#/components/parameters/CsrfHeader' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: User authenticated; tokens are set as cookies
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Rotate the refresh token
+      description: Reads the refresh token from the HttpOnly cookie. No request body is used.
+      security: [{ cookieAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/CsrfHeader' }]
+      responses:
+        '200':
+          description: Session refreshed; rotated tokens are set as cookies
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Log out the current user
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/CsrfHeader' }]
+      responses:
+        '204': { description: Session revoked and cookies cleared }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/auth/me:
+    get:
+      tags: [Authentication]
+      summary: Get the current user
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        '200':
+          description: Current authenticated user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/env:
+    get:
+      tags: [Target platform]
+      summary: Get the runtime environment
+      description: Public diagnostic endpoint exposed by the PoC.
+      responses:
+        '200':
+          description: Runtime environment information
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/users:
+    get:
+      tags: [Users]
+      summary: List users
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        '200':
+          description: Users returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [Users]
+      summary: Update the current user
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/CsrfHeader' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/User' }
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/users/{id}:
+    get:
+      tags: [Users]
+      summary: Get a user by id
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/UserId' }]
+      responses:
+        '200':
+          description: User returned
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/chats:
+    get:
+      tags: [Chat]
+      summary: List chats for the current user
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        '200':
+          description: Chats returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Chat' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Chat]
+      summary: Create a chat
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/CsrfHeader' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateChatRequest' }
+      responses:
+        '200':
+          description: Chat created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Chat' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/chats/open:
+    get:
+      tags: [Chat]
+      summary: List unassigned chats
+      description: Agent-only endpoint.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        '200':
+          description: Open chats returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Chat' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/chats/agent-view:
+    get:
+      tags: [Chat]
+      summary: List chats in the agent view
+      description: Agent-only endpoint.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: filter
+          in: query
+          schema:
+            type: string
+            default: all
+            enum: [all, closed, mine, waiting, assigned]
+      responses:
+        '200':
+          description: Filtered chats returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Chat' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/chats/agent-events:
+    get:
+      tags: [Chat]
+      summary: Subscribe to agent chat events
+      description: Server-Sent Events stream for agents.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/SseStream' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/chats/{chatId}:
+    get:
+      tags: [Chat]
+      summary: Get a chat
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ChatId' }]
+      responses:
+        '200':
+          description: Chat returned
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Chat' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/chats/{chatId}/claim:
+    post:
+      tags: [Chat]
+      summary: Claim a chat
+      description: Agent-only endpoint.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ChatId'
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          description: Chat claimed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Chat' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/chats/{chatId}/release:
+    post:
+      tags: [Chat]
+      summary: Release a chat
+      description: Agent-only endpoint for the active assigned agent.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ChatId'
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          description: Chat released for reassignment
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Chat' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/chats/{chatId}/close:
+    post:
+      tags: [Chat]
+      summary: Close a chat
+      description: Only the client participant can close the chat.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ChatId'
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          description: Chat closed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Chat' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/chats/{chatId}/events:
+    get:
+      tags: [Chat]
+      summary: Subscribe to chat events
+      description: Server-Sent Events stream for chat participants.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ChatId' }]
+      responses:
+        '200': { $ref: '#/components/responses/SseStream' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/chats/{chatId}/participants:
+    get:
+      tags: [Chat]
+      summary: List chat participants
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ChatId' }]
+      responses:
+        '200':
+          description: Participants returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ChatParticipant' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Chat]
+      summary: Add a chat participant
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ChatId'
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddChatParticipantRequest' }
+      responses:
+        '200':
+          description: Participant added
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChatParticipant' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/chats/{chatId}/messages:
+    get:
+      tags: [Chat]
+      summary: List chat messages
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ChatId' }]
+      responses:
+        '200':
+          description: Messages returned in creation order
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ChatText' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Chat]
+      summary: Send a chat message
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ChatId'
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SendChatTextRequest' }
+      responses:
+        '200':
+          description: Message sent
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChatText' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/reservations:
+    post:
+      tags: [Target platform]
+      summary: Create a reservation
+      description: Target-platform contract; not implemented by the chat PoC.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReservationCreate' }
+      responses:
+        '201':
+          description: Reservation created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Reservation' }
+  /webhooks/payments:
+    post:
+      tags: [Target platform]
+      summary: Receive a payment webhook
+      description: Target-platform contract; not implemented by the chat PoC.
+      parameters:
+        - $ref: '#/components/parameters/WebhookTimestamp'
+        - $ref: '#/components/parameters/WebhookSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PaymentWebhook' }
+      responses:
+        '200': { description: Event acknowledged }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token
+  parameters:
+    ChatId:
+      name: chatId
+      in: path
+      required: true
+      schema: { type: integer, format: int64, minimum: 1 }
+    UserId:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, format: int64, minimum: 1 }
+    CsrfHeader:
+      name: X-XSRF-TOKEN
+      in: header
+      required: true
+      schema: { type: string }
+    WebhookTimestamp:
+      name: X-WC-Timestamp
+      in: header
+      required: true
+      schema: { type: integer, format: int64 }
+    WebhookSignature:
+      name: X-WC-Signature
+      in: header
+      required: true
+      schema: { type: string }
+  responses:
+    SseStream:
+      description: Server-Sent Events stream
+      content:
+        text/event-stream:
+          schema: { type: string }
+    BadRequest: { description: Invalid request }
+    Unauthorized: { description: Authentication required or invalid credentials }
+    Forbidden: { description: Authenticated user is not allowed to perform this action }
+    NotFound: { description: Resource not found }
+    Conflict: { description: Request conflicts with the current resource state }
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [username, email, password]
+      properties:
+        username: { type: string, maxLength: 100 }
+        email: { type: string, format: email, maxLength: 254 }
+        password:
+          type: string
+          minLength: 8
+          description: Must contain upper/lower-case letters, a digit and a special character.
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, maxLength: 254 }
+        password: { type: string, maxLength: 72 }
+    AuthResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token: { type: string, description: Access JWT returned by the PoC for compatibility. }
+        user: { $ref: '#/components/schemas/User' }
+    User:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        username: { type: string }
+        email: { type: string, format: email }
+        password: { type: string, description: Always empty in API responses. }
+        role: { type: string, enum: [client, agent] }
+        createdAt: { type: string, format: date-time }
+    CreateChatRequest:
+      type: object
+      properties:
+        subject: { type: string, maxLength: 255 }
+        bookingId: { type: integer, format: int64 }
+        participantIds:
+          type: array
+          items: { type: integer, format: int64 }
+    Chat:
+      type: object
+      required: [id, chatUuid, status, createdAt, updatedAt]
+      properties:
+        id: { type: integer, format: int64 }
+        chatUuid: { type: string, format: uuid }
+        subject: { type: string }
+        bookingId: { type: integer, format: int64, nullable: true }
+        createdBy: { type: integer, format: int64 }
+        status: { type: string, enum: [open, assigned, waiting_reassignment, closed, archived] }
+        assignedAgentId: { type: integer, format: int64, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    AddChatParticipantRequest:
+      type: object
+      required: [userId]
+      properties:
+        userId: { type: integer, format: int64 }
+        role: { type: string, enum: [client, agent, system] }
+    ChatParticipant:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        chatId: { type: integer, format: int64 }
+        userId: { type: integer, format: int64 }
+        role: { type: string, enum: [client, agent, system] }
+        joinedAt: { type: string, format: date-time }
+        leftAt: { type: string, format: date-time, nullable: true }
+    SendChatTextRequest:
+      type: object
+      required: [content]
+      properties:
+        content: { type: string, minLength: 1, maxLength: 10000 }
+        contentType: { type: string, maxLength: 20 }
+    ChatText:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        chatId: { type: integer, format: int64 }
+        senderId: { type: integer, format: int64 }
+        contentType: { type: string }
+        content: { type: string }
+        status: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ReservationCreate:
+      type: object
+      required: [vehicleId, startDate, endDate]
+      properties:
+        vehicleId: { type: string }
+        startDate: { type: string, format: date-time }
+        endDate: { type: string, format: date-time }
+        pickupAgencyId: { type: string }
+        returnAgencyId: { type: string }
+    Reservation:
+      type: object
+      properties:
+        id: { type: string }
+        status: { type: string }
+        totalPrice: { type: number, format: float }
+        currency: { type: string }
+    PaymentWebhook:
+      type: object
+      required: [event_id, type, data]
+      properties:
+        event_id: { type: string }
+        type: { type: string }
+        created: { type: integer, format: int64 }
+        data: { type: object, additionalProperties: true }

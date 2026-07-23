@@ -1,11 +1,4 @@
 -- ACRISS vehicle classification reference data.
--- SAFE DROP BLOCK
--- Drop ACRISS reference tables (reverse creation order)
-DROP TABLE IF EXISTS acriss_passenger_van_rule CASCADE;
-DROP TABLE IF EXISTS acriss_fuel_air_conditioning CASCADE;
-DROP TABLE IF EXISTS acriss_transmission_drive CASCADE;
-DROP TABLE IF EXISTS acriss_vehicle_type CASCADE;
-DROP TABLE IF EXISTS acriss_category CASCADE;
 -- The four code positions are validated independently and the passenger-van
 -- prefixes are kept as a separate reference for the expanded ACRISS table.
 CREATE TABLE IF NOT EXISTS acriss_category (
