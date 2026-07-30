@@ -475,9 +475,9 @@ Les routes d'authentification utilisées par le frontend sont exposées sous `/a
 
 Les requêtes modifiantes utilisent les cookies d'authentification et le header CSRF géré par le frontend. Les cookies ne sont pas lus directement par le code Angular.
 
-### Contrat OpenAPI (`openapi.yaml`)
+### Contrat OpenAPI de la PoC (`openapi-poc.yaml`)
 
-Le fichier [`openapi.yaml`](openapi.yaml) est le contrat versionné de l'API au format OpenAPI 3.0.3. Il décrit les échanges attendus entre le frontend, le backend et les futurs clients ou systèmes tiers :
+Le fichier [`openapi-poc.yaml`](openapi-poc.yaml) est le contrat versionné de l'API de la PoC au format OpenAPI 3.0.3. Il décrit les échanges attendus entre le frontend et le backend de la PoC :
 
 - les routes, leur méthode HTTP et leur rôle métier dans `paths` ;
 - les paramètres de chemin, de requête et les headers ;
@@ -530,7 +530,7 @@ Le nom `{chatId}` est un paramètre de chemin. Son type et sa contrainte (`int64
 
 #### Fichier statique et documentation générée
 
-`PoC/openapi.yaml` est un fichier documentaire versionné : Spring Boot ne le charge pas automatiquement pour construire les routes et il ne remplace pas les contrôleurs Java. Les routes réelles sont implémentées dans `back/src/main/java/.../controller/`.
+`PoC/openapi-poc.yaml` est un fichier documentaire versionné : Spring Boot ne le charge pas automatiquement pour construire les routes et il ne remplace pas les contrôleurs Java. Les routes réelles sont implémentées dans `back/src/main/java/.../controller/`.
 
 Le backend utilise également Springdoc, qui génère une description OpenAPI à partir des contrôleurs et des annotations Java pendant l'exécution :
 
@@ -538,7 +538,7 @@ Le backend utilise également Springdoc, qui génère une description OpenAPI à
 | --- | --- |
 | `http://localhost:8080/swagger-ui.html` | Consulter et tester l'API dans une interface graphique |
 | `http://localhost:8080/v3/api-docs` | Consulter le contrat OpenAPI généré au format JSON |
-| [`openapi.yaml`](openapi.yaml) | Lire, relire et partager le contrat versionné, notamment avant l'implémentation d'un client |
+| [`openapi-poc.yaml`](openapi-poc.yaml) | Lire, relire et partager le contrat versionné de la PoC, notamment avant l'implémentation d'un client |
 
 La documentation générée reflète le code exécuté. Le fichier YAML est la référence lisible et versionnée du contrat attendu. Après toute modification d'une route, d'un DTO, d'un mécanisme d'authentification ou d'une réponse, il faut vérifier la cohérence entre le YAML, les contrôleurs Java et la documentation Springdoc. Le YAML ne doit pas être présenté comme une preuve qu'une route cible est déjà implémentée : les routes réservation et paiement y sont documentées pour l'architecture cible, mais restent hors du périmètre de cette PoC.
 
@@ -547,7 +547,7 @@ La documentation générée reflète le code exécuté. Le fichier YAML est la r
 Depuis le dossier `PoC`, la validation peut être effectuée avec un validateur OpenAPI :
 
 ```powershell
-npx --yes @redocly/cli lint openapi.yaml
+npx --yes @redocly/cli lint openapi-poc.yaml
 ```
 
 Cette commande vérifie la syntaxe YAML, les références `$ref` et la conformité OpenAPI. Elle nécessite Node.js et peut télécharger l'outil lors de la première exécution. Une validation réussie ne remplace pas les tests backend : elle confirme uniquement que le contrat est exploitable par des outils OpenAPI.
