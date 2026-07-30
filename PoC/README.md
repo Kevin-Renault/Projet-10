@@ -2,30 +2,189 @@
 
 Cette preuve de concept démontre le parcours d'un tchat entre un client et un agent. Elle couvre uniquement la fonctionnalité de tchat et ne constitue pas l'application complète de réservation.
 
-## Périmètre de la PoC
+## Sommaire
 
-La PoC permet de :
+- [**Introduction**](#introduction)
+    - [Périmètre de la PoC](#périmètre-de-la-poc)
+    - [Technologies utilisées](#technologies-utilisées)
 
-- créer et consulter une conversation ;
-- lire et enregistrer des messages dans PostgreSQL ;
-- authentifier un client ou un agent ;
-- prendre en charge une conversation en attente ;
-- libérer une conversation attribuée ;
-- afficher les conversations en attente, attribuées ou clôturées ;
-- recevoir les nouveaux messages et changements d'état par SSE ;
-- clôturer une conversation côté client ;
-- bloquer l'envoi de messages après clôture ;
-- contrôler les droits d'accès côté backend.
+- [**Installation**](#installation)
+    - [Prérequis](#prérequis)
+    - [Récupérer le projet](#récupérer-le-projet)
+    - [Initialiser PostgreSQL](#initialiser-postgresql)
+        - [Développement local uniquement](#développement-local-uniquement)
+        - [Environnement persistant hors développement local](#environnement-persistant-hors-développement-local)
+        - [Initialisation automatique par Spring](#initialisation-automatique-par-spring)
+    - [Démarrer le backend](#démarrer-le-backend)
+    - [Démarrer le frontend](#démarrer-le-frontend)
+        - [Mode mock](#mode-mock)
+        
+- [**Validation & scénarii**](#validation--scenarii)
+    - [Comptes de démonstration](#comptes-de-démonstration)
+    - [Statuts d'une conversation](#statuts-dune-conversation)
+    - [Parcours de validation](#parcours-de-validation)
+        - [Parcours client et agent](#parcours-client-et-agent)
+        - [Parcours de libération et de reprise](#parcours-de-libération-et-de-reprise)
+        - [Controle des droits](#controle-des-droits)
 
-La PoC ne comprend pas le parcours de réservation, le paiement, la gestion complète des véhicules, Redis, RabbitMQ, Kubernetes ou une supervision de production.
+- [**API du tchat**](#api-du-tchat)
+    - [Contrat OpenAPI](#contrat-openapi)
+        - [Comment lire le fichier](#comment-lire-le-fichier)
+        - [Fichier statique et documentation générée](#fichier-statique-et-documentation-générée)
+        - [Valider le YAML](#valider-le-yaml)
 
-## Technologies utilisées
+- [**Tests et build**](#tests-et-build)
+    - [Frontend](#frontend)
+    - [Backend](#backend)
+
+- [Structure réelle de la PoC](#structure-réelle-de-la-poc)
+
+## Introduction
+
+## Quick-start (5 minutes)
+
+Suivez ces étapes pour démarrer rapidement la PoC en local.
+1. Cloner le dépôt et se placer dans le dossier PoC :
+
+```powershell
+git clone https://github.com/Kevin-Renault/Projet-10.git
+Set-Location Projet-10\PoC
+```
+
+2. Préparer les variables d'environnement pour l'application
+
+```powershell
+# Copier l'exemple et éditer les secrets locaux (ne PAS committer PoC/back/.env)
+copy PoC\back\.env.example PoC\back\.env
+notepad PoC\back\.env    # éditer DB_PASSWORD et JWT_SECRET
+```
+
+3. Démarrer PostgreSQL et initialiser la base (utilise les valeurs de `PoC/back/.env`)
+
+```powershell
+# Recommended: use docker compose to start Postgres and run the SQL init scripts
+docker compose -f PoC\docker-compose.yml up -d --build
+
+# Follow Postgres logs (will show initialization progress)
+docker compose -f PoC\docker-compose.yml logs -f postgres
+
+# If you need a clean re-init, stop and remove volumes first:
+# docker compose -f PoC\docker-compose.yml down -v
+```
+
+4. Vérifier que PostgreSQL est prêt
+
+```powershell
+# Attendre que Postgres accepte les connexions
+docker exec postgres18 bash -lc 'until pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"; do sleep 1; done'
+```
+
+Les scripts SQL sont exécutés automatiquement par PostgreSQL lors de la création
+du volume Docker. Ils ne sont pas relancés par le backend Spring.
+
+5. Charger les variables d'environnement dans la session PowerShell et démarrer le backend
+
+```powershell
+Get-Content PoC\back\.env | ForEach-Object {
+    if ($_ -match '^\s*([^#=]+)=(.*)$') {
+        $name = $matches[1].Trim(); $val = $matches[2].Trim()
+        $env:$name = $val
+        # map POSTGRES_* -> DB_* expected by the Spring Boot app
+        switch ($name) {
+            'POSTGRES_DB' { $env:DB_YCYW_NAME = $val }
+            'POSTGRES_USER' { $env:DB_USER = $val }
+            'POSTGRES_PASSWORD' { $env:DB_PASSWORD = $val }
+            default { }
+        }
+    }
+}
+
+Set-Location PoC\back
+.\mvnw.cmd spring-boot:run
+```
+
+6. Démarrer le frontend (séparé)
+
+```powershell
+Set-Location PoC\front
+npm ci
+npm start
+```
+
+7. Vérifier les points d'accès
+
+- Frontend : http://localhost:4200
+- Swagger backend : http://localhost:8080/swagger-ui.html
+
+Notes et bonnes pratiques
+
+- `PoC/back/.env` contient des secrets locaux ; **ne** le commitez pas. Utilisez un `.env.example` (placeholders) pour documenter les variables. 
+- Préférez `--env-file` ou `docker-compose` pour éviter d'exposer des mots de passe dans l'historique de commandes.
+- Si le conteneur PostgreSQL redémarre ou s'arrête immédiatement, inspectez les logs :
+    ```powershell
+    docker logs postgres18 --tail 200
+    ```
+- Pour nettoyer :
+    ```powershell
+    docker rm -f postgres18
+    docker volume rm pgdata
+    ```
+
+### Périmètre de la PoC
+
+#### Fonctionnel
+
+Un client peut :
+- se connecter de façon sécurisée en tant que client
+- accéder à l'interface client
+- créer et consulter une conversation
+- répondre à une de ses conversations
+- clôturer une de ses conversations
+- se déconnecter
+
+Un agent peut :
+- se connecter de façon sécurisée en tant qu'agent
+- accéder à l'interface agent
+- prendre une conversation en attente (nouvelle ou libérée)
+- répondre aux clients dans les conversations qu'il a en charge
+- libérer une conversation attribuée
+- se déconnecter
+
+#### Implémentation technique
+
+Cette section décrit comment la PoC réalise les fonctions listées ci‑dessus (emplacement du code, choix d'implémentation). Pour la liste des bibliothèques et versions, voir **Technologies utilisées**.
+
+- Architecture : monolithe Spring Boot (`PoC/back`) pour l'API et Angular (`PoC/front`) pour le client ; voir la section *Structure réelle de la PoC* pour l'arborescence.
+- Persistance : PostgreSQL pour les entités du domaine (messages, conversations, utilisateurs). Les scripts SQL se trouvent dans `back/src/main/resources` ; pour appliquer l'ensemble (y compris les fonctions/trigger PL/pgSQL) voir `Livrables/Database/INSTALL.md`.
+- Temps réel : notifications par Server‑Sent Events (implémentées côté serveur avec `SseEmitter`, côté client via `EventSource`).
+- Mode mock : le frontend propose un mode mock (`environment.dev`) pour tester l'UI sans backend (services `*MockService`).
+- Sécurité & authentification : mécanisme d'authentification et sessions détaillé dans la sous‑section **Sessions et authentification** ci‑dessous.
+- Tests & validation : le front/back contiennent des suites unitaires et E2E (Jest/Cypress côté frontend, JUnit côté backend) — voir la section *Tests et build*.
+
+##### Sessions et authentification
+
+- Mécanisme : la PoC utilise un access token JWT pour l'authentification des requêtes et un refresh token opaque pour prolonger la session.
+- Cookies : les deux tokens sont envoyés au client en cookies `HttpOnly` (impossibles à lire depuis JavaScript). Le refresh cookie est limité au chemin `/api/auth`.
+- Stockage serveur : les refresh tokens opaques sont hashés (SHA-256) et stockés en base (`refresh_token`) avec une date d'expiration.
+- Rotation : lors d'un appel à `/api/auth/refresh` le refresh token présenté est vérifié, supprimé et remplacé par un nouveau (rotation). Le backend renvoie un nouveau access cookie et un nouveau refresh cookie.
+- Révocation : l'appel à `/api/auth/logout` révoque le refresh token (suppression côté serveur) et efface les cookies côté client.
+- Durées par défaut : access token ~ `86400s` (1 jour), refresh token ~ `2592000s` (30 jours) — réglables via `security.jwt.*`.
+- Frontend : `AuthService.initSession()` tente de récupérer `/api/auth/me`; si le token d'accès est expiré il appelle `/api/auth/refresh` puis retente `/me`. Un intercepteur (`RefreshOn401Interceptor`) déclenche automatiquement `/api/auth/refresh` sur `401` et réessaie la requête.
+- CSRF : endpoint `/api/auth/csrf` initialise le cookie `XSRF-TOKEN` et le backend expose le token via l'en-tête `X-XSRF-TOKEN` pour les clients.
+
+#### Limites connues
+
+La PoC n'implémente pas le parcours de réservation, le paiement ni l'infrastructure distribuée (Redis, RabbitMQ, Kubernetes) ou une supervision de production. En revanche, elle permet de valider les choix technologiques cibles (Java 21, Spring Boot, Angular, PostgreSQL) sur les parcours fonctionnels montrés dans cette PoC.
+
+
+
+### Technologies utilisées
 
 | Composant | Technologie |
 | --- | --- |
 | Frontend | Angular 21, TypeScript, RxJS |
 | Backend | Java 21, Spring Boot 3.2, Spring MVC |
-| Base de données | PostgreSQL 13 ou plus récent |
+| Base de données | PostgreSQL 18 (stable) ou plus récent |
 | Persistance | Spring Data JPA et Hibernate |
 | Authentification | Spring Security, JWT et cookies HttpOnly |
 | Protection des requêtes | CSRF avec cookie et header `X-XSRF-TOKEN` |
@@ -33,14 +192,16 @@ La PoC ne comprend pas le parcours de réservation, le paiement, la gestion comp
 | Tests frontend | Jest, Karma/Jasmine et Cypress |
 | Tests backend | JUnit, Spring Boot Test et Mockito |
 
-## Prérequis
+## Installation
+
+### Prérequis
 
 Installer :
 
-- Java 21 ;
-- Node.js et npm ;
-- PostgreSQL 13 ou plus récent ;
-- Git.
+- Java 21 — Temurin (Adoptium) : https://adoptium.net/temurin/releases/?version=21
+- Node.js (LTS) et npm : https://nodejs.org/en/download/
+- PostgreSQL 18 (stable) : https://www.postgresql.org/download/
+- Git : https://git-scm.com/downloads
 
 Vérifier les installations :
 
@@ -53,7 +214,7 @@ psql --version
 
 Le backend attend PostgreSQL sur `localhost:5432`. L'utilisateur PostgreSQL doit pouvoir se connecter à la base et, lors de la première installation, créer l'extension `pgcrypto`.
 
-## Récupérer le projet
+### Récupérer le projet
 
 ```powershell
 git clone https://github.com/Kevin-Renault/Projet-10.git
@@ -62,7 +223,7 @@ Set-Location Projet-10\PoC
 
 Si le dépôt est déjà présent, se placer directement dans le dossier `PoC`.
 
-## Initialiser PostgreSQL
+### Initialiser PostgreSQL
 
 Créer une base vide :
 
@@ -72,7 +233,7 @@ createdb -U postgres ycyw_poc
 
 Le backend lit sa configuration dans les variables d'environnement. Elles doivent être définies avant son démarrage, dans le même environnement que celui qui exécute Maven.
 
-### Développement local uniquement
+#### Développement local uniquement
 
 Pour un test local rapide, définir les variables dans le terminal PowerShell qui lancera le backend :
 
@@ -85,7 +246,7 @@ $env:JWT_SECRET = "cle-locale-de-developpement-d-au-moins-32-caracteres"
 
 Cette méthode est pratique pour le développement local : les variables restent disponibles uniquement dans ce terminal et les processus lancés depuis celui-ci. Elles disparaissent lorsque le terminal est fermé. Ne pas utiliser de mots de passe ou de secrets réels dans ce fichier ou dans un script versionné.
 
-### Environnement persistant hors développement local
+#### Environnement persistant hors développement local
 
 Pour une installation persistante sur Windows, définir les variables d'environnement au niveau du système ou du compte utilisateur, puis redémarrer le terminal et les services concernés. Par exemple, depuis un terminal PowerShell ouvert avec les droits nécessaires :
 
@@ -111,9 +272,22 @@ Ne pas committer ces valeurs. Le backend utilise aussi, si nécessaire, les vari
 | `JWT_COOKIE_SECURE` | `false` | Cookie HTTPS ou non |
 | `JWT_COOKIE_SAMESITE` | `Lax` | Politique SameSite |
 
-### Initialisation automatique par Spring
+#### Initialisation locale par Spring (optionnelle)
 
-Au démarrage, Spring exécute les scripts SQL suivants depuis `back/src/main/resources` :
+Par défaut, Spring n'exécute aucun script SQL au démarrage :
+
+```properties
+spring.sql.init.mode=never
+```
+
+Pour demander exceptionnellement à Spring d'exécuter les scripts SQL depuis
+`back/src/main/resources`, remplacer cette valeur par :
+
+```properties
+spring.sql.init.mode=always
+```
+
+Les scripts concernés sont :
 
 ```text
 00_extensions_and_settings.sql
@@ -129,7 +303,7 @@ Au démarrage, Spring exécute les scripts SQL suivants depuis `back/src/main/re
 
 Le script `06_triggers_and_functions.sql` n'est pas exécuté par le séparateur SQL Spring, car il contient des blocs PL/pgSQL. Pour appliquer l'ensemble du schéma, utiliser la procédure documentée dans [Livrables/Database/INSTALL.md](../Livrables/Database/INSTALL.md) et le script `Livrables/Database/apply_all.ps1`.
 
-## Démarrer le backend
+### Démarrer le backend
 
 Depuis `PoC/back`, après avoir défini les variables PostgreSQL et JWT :
 
@@ -140,7 +314,38 @@ Set-Location PoC\back
 
 Le backend démarre sur `http://localhost:8080`.
 
-## Démarrer le frontend
+### Profils Spring Boot (docker vs local)
+
+Ce projet fournit deux fichiers de configuration complémentaires pour faciliter l'exécution selon l'environnement :
+
+- `back/src/main/resources/application-docker.properties` : utilisé quand l'application tourne avec Docker Compose. Il connecte la JVM au service Postgres du réseau Docker (hôte `postgres`) et lit les variables `POSTGRES_*` fournies par `back/.env` ou `docker-compose`.
+- `back/src/main/resources/application-local.properties` : utilisé pour le développement local avec PostgreSQL accessible sur `localhost`. Il utilise les variables `DB_YCYW_NAME`, `DB_USER` et `DB_PASSWORD` (ou des valeurs de secours définies dans le fichier).
+
+Comment lancer avec un profil :
+
+- Lancer depuis un shell (profil `local`) :
+
+```powershell
+# profil local (Postgres sur localhost)
+Set-Location PoC\back
+.\mvnw.cmd -Dspring-boot.run.profiles=local spring-boot:run
+```
+
+- Lancer avec Docker Compose (profil `docker`) :
+
+```powershell
+# démarrer Postgres via docker-compose
+docker compose -f PoC\docker-compose.yml up -d
+
+# lancer le backend en demandant explicitement le profil docker
+Set-Location PoC\back
+.\mvnw.cmd -Dspring-boot.run.profiles=docker spring-boot:run
+```
+
+Avec Docker, une autre option est d'exporter `SPRING_PROFILES_ACTIVE=docker` dans la configuration d'environnement du service `back` dans `docker-compose.yml` — cependant, la méthode ci‑dessus (passage de profil par l'option Maven) est non destructive et simple pour tester.
+
+
+### Démarrer le frontend
 
 Dans un second terminal :
 
@@ -154,7 +359,7 @@ Ouvrir ensuite `http://localhost:4200`.
 
 Le frontend utilise `proxy.conf.json` pour transmettre les appels `/api` vers `http://localhost:8080`. La configuration par défaut utilise `environment.ts` et les services réels.
 
-### Mode mock
+#### Mode mock
 
 Le mode mock permet de tester l'interface sans démarrer PostgreSQL ni le backend :
 
@@ -166,7 +371,10 @@ Ce mode utilise `environment.dev.ts`, `AuthMockService`, `ChatMockService` et le
 
 La configuration Angular `normal` utilise également les services réels. Elle ne correspond pas à un fichier `environment.normal.ts` : ce fichier n'existe pas dans la PoC.
 
-## Comptes de démonstration
+<a name="validation--scenarii"></a>
+## Validation & scénarii
+
+### Comptes de démonstration
 
 Les comptes sont créés par `09_person_seed.sql` :
 
