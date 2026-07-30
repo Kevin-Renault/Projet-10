@@ -1,4 +1,4 @@
-# Contrat Webhook - Paiements (cadre cible)
+# Cadre d'intégration des webhooks de paiement (cible)
 
 Endpoint
 - `POST /webhooks/payments`

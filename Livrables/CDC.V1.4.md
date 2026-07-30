@@ -307,7 +307,7 @@ En tant que client, je veux échanger avec un agent dans une conversation sécur
   - Tests unitaires et tests d'intégration couverts (coverage raisonnable selon le projet).
   - Tests end‑to‑end (parcours critiques) verts en CI pour la fonctionnalité.
   - OpenAPI mis à jour si l'API a été modifiée ([API/openapi.yaml](API/openapi.yaml)).
-  - Contrat webhook mis à jour si nécessaire ([API/webhook-contract.md](API/webhook-contract.md)).
+  - Cadre d'intégration webhook mis à jour si nécessaire ([API/webhook-integration-framework.md](API/webhook-integration-framework.md)).
   - Revue accessibilité : axe-core **critical** et **serious** issues résolues; tests contraste automatisés passés.
   - Documentation utilisateur/minimale et notes de release disponibles.
   - Merge request acceptée et pipeline CI verte.
@@ -316,7 +316,7 @@ En tant que client, je veux échanger avec un agent dans une conversation sécur
 
 - Les artefacts techniques et contracts associés à ce CDC se trouvent dans le dépôt :
   - OpenAPI : [API/openapi.yaml](API/openapi.yaml)
-  - Contrat Webhook : [API/webhook-contract.md](API/webhook-contract.md)
+  - Cadre d'intégration webhook : [API/webhook-integration-framework.md](API/webhook-integration-framework.md)
   - Proposition d'architecture : [Proposition-Architecture.md](Proposition-Architecture.md)
   - PoC et instructions : [PoC/README.md](PoC/README.md)
 
