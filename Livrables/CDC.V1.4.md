@@ -87,7 +87,7 @@ En tant que client disposant d’un compte, je veux supprimer mon compte afin de
 - Étant donné un client naviguant au clavier ou à l’aide d’un lecteur d’écran, quand il demande la suppression de son compte, alors il peut comprendre l’action demandée, saisir son mot de passe et confirmer l’opération.
 
 ---
-#### **US-14 - Création de compte** *(Nouveau)*
+#### **US-14 - Création de compte** 
 En tant que nouveau client, je veux créer un compte afin d’accéder aux fonctionnalités de réservation et de gestion de profil.
 
 **Critères d’acceptation** :
@@ -100,7 +100,7 @@ En tant que nouveau client, je veux créer un compte afin d’accéder aux fonct
 - Le mot de passe doit respecter des critères de complexité (ex. : 8 caractères minimum, 1 majuscule, 1 chiffre).
 
 ---
-#### **US-15 - Authentification** *(Nouveau)*
+#### **US-15 - Authentification** 
 En tant que client, je veux me connecter à mon compte afin d’accéder à mes réservations et à mon profil.
 
 **Critères d’acceptation** :
@@ -240,7 +240,7 @@ En tant qu’utilisateur de l’application, je veux que les échanges avec les 
 - Étant donné un échange avec un service tiers, quand une clé, un secret ou un jeton est nécessaire, alors cette donnée n’est pas exposée dans le code source, les réponses API ou les journaux applicatifs.
 
 ---
-### **6. Gestion de session accessible** *(Nouveau)*
+### **6. Gestion de session accessible** 
 
 #### **US-16 - Gestion de session avec refresh tokens**
 En tant que client, y compris en situation de handicap, je veux que ma session soit prolongée automatiquement afin d’éviter les reconnexions fréquentes et de maintenir un accès fluide à l’application.
@@ -267,8 +267,9 @@ En tant que client, y compris en situation de handicap, je veux que ma session s
 ---
 ## Priorisation / Releases
 
+- Lot préparatoire — Socle sécurisé préalable : US-14, US-15, US-16.
 - Release 1 — Périmètre de la première livraison : US-01, US-02, US-03, US-04, US-05, US-06, US-07.
-- Release 2 : US-08, US-09, US-10, US-11, US-13, US-15, US-16, US-17.
+- Release 2 : US-08, US-09, US-10, US-11, US-13, US-17.
 
 ## Definition of Ready (DoR) et Definition of Done (DoD) — Release 1 (MVP)
 
