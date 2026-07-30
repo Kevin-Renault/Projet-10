@@ -23,7 +23,7 @@ Inclut : comptes utilisateurs, recherche et réservation de véhicules, paiement
 
 ## Exigences fonctionnelles consolidées
 
-Règles générales : identifiants en UUIDv4, timestamps ISO8601, formats JSON (schéma et contrats détaillés dans [API/openapi.yaml](API\openapi.yaml)).
+Règles générales : identifiants en UUIDv4, timestamps ISO8601, formats JSON (schéma et contrats détaillés dans [API/openapi.yaml](API/openapi.yaml)).
 
 - Gestion du compte
   - Créer un compte utilisateur avec email + mot de passe et confirmation par email.
