@@ -54,22 +54,22 @@ Set-Location Projet-10\PoC
 2. Préparer les variables d'environnement pour l'application
 
 ```powershell
-# Copier l'exemple et éditer les secrets locaux (ne PAS committer PoC/back/.env)
-copy PoC\back\.env.example PoC\back\.env
-notepad PoC\back\.env    # éditer DB_PASSWORD et JWT_SECRET
+# Copier l'exemple et éditer les secrets locaux (ne PAS committer back/.env)
+copy back\.env.example back\.env
+notepad back\.env    # éditer DB_PASSWORD et JWT_SECRET
 ```
 
-3. Démarrer PostgreSQL et initialiser la base (utilise les valeurs de `PoC/back/.env`)
+3. Démarrer PostgreSQL et initialiser la base (utilise les valeurs de `back/.env`)
 
 ```powershell
 # Recommended: use docker compose to start Postgres and run the SQL init scripts
-docker compose -f PoC\docker-compose.yml up -d --build
+docker compose -f docker-compose.yml up -d --build
 
 # Follow Postgres logs (will show initialization progress)
-docker compose -f PoC\docker-compose.yml logs -f postgres
+docker compose -f docker-compose.yml logs -f postgres
 
 # If you need a clean re-init, stop and remove volumes first:
-# docker compose -f PoC\docker-compose.yml down -v
+# docker compose -f docker-compose.yml down -v
 ```
 
 4. Vérifier que PostgreSQL est prêt
@@ -85,7 +85,7 @@ du volume Docker. Ils ne sont pas relancés par le backend Spring.
 5. Charger les variables d'environnement dans la session PowerShell et démarrer le backend
 
 ```powershell
-Get-Content PoC\back\.env | ForEach-Object {
+Get-Content back\.env | ForEach-Object {
     if ($_ -match '^\s*([^#=]+)=(.*)$') {
         $name = $matches[1].Trim(); $val = $matches[2].Trim()
         $env:$name = $val
@@ -99,14 +99,14 @@ Get-Content PoC\back\.env | ForEach-Object {
     }
 }
 
-Set-Location PoC\back
+Set-Location back
 .\mvnw.cmd spring-boot:run
 ```
 
 6. Démarrer le frontend (séparé)
 
 ```powershell
-Set-Location PoC\front
+Set-Location front
 npm ci
 npm start
 ```
@@ -118,7 +118,7 @@ npm start
 
 Notes et bonnes pratiques
 
-- `PoC/back/.env` contient des secrets locaux ; **ne** le commitez pas. Utilisez un `.env.example` (placeholders) pour documenter les variables. 
+- `back/.env` contient des secrets locaux ; **ne** le commitez pas. Utilisez un `.env.example` (placeholders) pour documenter les variables. 
 - Préférez `--env-file` ou `docker-compose` pour éviter d'exposer des mots de passe dans l'historique de commandes.
 - Si le conteneur PostgreSQL redémarre ou s'arrête immédiatement, inspectez les logs :
     ```powershell
@@ -155,11 +155,19 @@ Un agent peut :
 Cette section décrit comment la PoC réalise les fonctions listées ci‑dessus (emplacement du code, choix d'implémentation). Pour la liste des bibliothèques et versions, voir **Technologies utilisées**.
 
 - Architecture : monolithe Spring Boot (`PoC/back`) pour l'API et Angular (`PoC/front`) pour le client ; voir la section *Structure réelle de la PoC* pour l'arborescence.
-- Persistance : PostgreSQL pour les entités du domaine (messages, conversations, utilisateurs). Les scripts SQL se trouvent dans `back/src/main/resources` ; pour appliquer l'ensemble (y compris les fonctions/trigger PL/pgSQL) voir `Livrables/Database/INSTALL.md`.
+- Persistance : PostgreSQL pour les entités du domaine (messages, conversations, utilisateurs). Les scripts SQL se trouvent dans `back/src/main/resources` ; pour appliquer l'ensemble (y compris les fonctions/trigger PL/pgSQL), utiliser `Livrables/Database/apply_all.ps1`.
 - Temps réel : notifications par Server‑Sent Events (implémentées côté serveur avec `SseEmitter`, côté client via `EventSource`).
 - Mode mock : le frontend propose un mode mock (`environment.dev`) pour tester l'UI sans backend (services `*MockService`).
 - Sécurité & authentification : mécanisme d'authentification et sessions détaillé dans la sous‑section **Sessions et authentification** ci‑dessous.
 - Tests & validation : le front/back contiennent des suites unitaires et E2E (Jest/Cypress côté frontend, JUnit côté backend) — voir la section *Tests et build*.
+
+#### Relation avec le CDC et ses releases
+
+Le CDC décrit le produit cible et organise ses fonctionnalités par livraisons : un lot préparatoire regroupe le socle sécurisé (US-14, US-15 et US-16), la Release 1 regroupe le MVP de réservation (US-01 à US-07) et la Release 2 regroupe l'historique, la modification de réservation, l'intégration agence, l'internationalisation et les services tiers (US-08, US-09, US-10, US-11, US-13 et US-17). Un lot technique distinct, déjà démontré par cette PoC, couvre le tchat client-agent (US-18).
+
+Cette PoC ne constitue pas l'implémentation complète de ces releases. Elle valide une tranche technique ciblée, centrée sur le tchat, avec l'authentification et la gestion de session nécessaires à son fonctionnement. Le socle sécurisé et le tchat sont donc démontrés techniquement, sans que cela signifie que la Release 1 ou la Release 2 sont entièrement livrées.
+
+Les fonctionnalités de réservation, de paiement et d'infrastructure distribuée décrites dans le CDC et l'architecture cible restent hors du périmètre implémenté de cette PoC.
 
 ##### Sessions et authentification
 
@@ -301,14 +309,14 @@ Les scripts concernés sont :
 09_person_seed.sql
 ```
 
-Le script `06_triggers_and_functions.sql` n'est pas exécuté par le séparateur SQL Spring, car il contient des blocs PL/pgSQL. Pour appliquer l'ensemble du schéma, utiliser la procédure documentée dans [Livrables/Database/INSTALL.md](../Livrables/Database/INSTALL.md) et le script `Livrables/Database/apply_all.ps1`.
+Le script `06_triggers_and_functions.sql` n'est pas exécuté par le séparateur SQL Spring, car il contient des blocs PL/pgSQL. Pour appliquer l'ensemble du schéma, utiliser le script `Livrables/Database/apply_all.ps1`.
 
 ### Démarrer le backend
 
-Depuis `PoC/back`, après avoir défini les variables PostgreSQL et JWT :
+Depuis `back`, après avoir défini les variables PostgreSQL et JWT :
 
 ```powershell
-Set-Location PoC\back
+Set-Location back
 .\mvnw.cmd spring-boot:run
 ```
 
@@ -327,7 +335,7 @@ Comment lancer avec un profil :
 
 ```powershell
 # profil local (Postgres sur localhost)
-Set-Location PoC\back
+Set-Location back
 .\mvnw.cmd -Dspring-boot.run.profiles=local spring-boot:run
 ```
 
@@ -335,10 +343,10 @@ Set-Location PoC\back
 
 ```powershell
 # démarrer Postgres via docker-compose
-docker compose -f PoC\docker-compose.yml up -d
+docker compose -f docker-compose.yml up -d
 
 # lancer le backend en demandant explicitement le profil docker
-Set-Location PoC\back
+Set-Location back
 .\mvnw.cmd -Dspring-boot.run.profiles=docker spring-boot:run
 ```
 
@@ -350,7 +358,7 @@ Avec Docker, une autre option est d'exporter `SPRING_PROFILES_ACTIVE=docker` dan
 Dans un second terminal :
 
 ```powershell
-Set-Location PoC\front
+Set-Location front
 npm ci
 npm start
 ```
@@ -605,7 +613,7 @@ PoC/
             └── store/                # État frontend
 ```
 
-Les scripts SQL et leur procédure d'installation complète se trouvent dans [Livrables/Database](../Livrables/Database). Les documents d'architecture du projet sont conservés dans `Livrables/`, mais ils ne décrivent pas des composants installés dans cette PoC.
+Les scripts SQL et le script d'application du schéma se trouvent dans [Livrables/Database](../Livrables/Database). Les documents d'architecture du projet sont conservés dans `Livrables/`, mais ils ne décrivent pas des composants installés dans cette PoC.
 
 ## Limites connues
 
