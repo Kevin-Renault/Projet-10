@@ -615,6 +615,33 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '409': { $ref: '#/components/responses/Conflict' }
 
+  /api/reservations/{reservationId}/payment:
+    post:
+      tags: [Target platform]
+      summary: Initialize payment for a reservation
+      description: >-
+        Creates a payment session with the selected provider and returns the
+        information required to continue the external payment journey. The
+        payment is confirmed asynchronously through the payment webhook.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ReservationId'
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PaymentInitializationRequest' }
+      responses:
+        '201':
+          description: Payment session initialized
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaymentInitialization' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
   /api/agency/users:
     get:
       tags: [Target platform]
@@ -784,6 +811,7 @@ components:
         email: { type: string, format: email }
         password: { type: string, description: Always empty in API responses. }
         role: { type: string, enum: [client, agent] }
+        preferredLanguage: { type: string, pattern: '^[a-z]{2}$', default: fr, description: Preferred language persisted for the user. ISO 639-1 code. }
         createdAt: { type: string, format: date-time }
     CreateChatRequest:
       type: object
@@ -929,6 +957,27 @@ components:
         refundCurrency: { type: string, minLength: 3, maxLength: 3 }
         refundStatus: { type: string, enum: [not_refunded, pending, processed, failed] }
         refundPolicyCode: { type: string, maxLength: 50, description: Reference code of the policy applied to the cancellation. }
+    PaymentInitializationRequest:
+      type: object
+      required: [provider]
+      properties:
+        provider:
+          type: string
+          enum: [stripe, paypal]
+          description: Payment provider selected for the external payment journey.
+    PaymentInitialization:
+      type: object
+      required: [id, reservationId, provider, status, amount, currency, checkoutUrl]
+      properties:
+        id: { type: string, format: uuid, description: Internal payment identifier. }
+        reservationId: { type: string, format: uuid }
+        provider: { type: string, enum: [stripe, paypal] }
+        providerPaymentId: { type: string, description: Provider payment or checkout identifier when available. }
+        status: { type: string, enum: [pending, requires_action, processing] }
+        amount: { type: number, format: double, minimum: 0, description: Amount to be paid in the reservation currency. }
+        currency: { type: string, pattern: '^[A-Z]{3}$', description: ISO 4217 currency code. }
+        checkoutUrl: { type: string, format: uri, description: URL or provider entry point for the external payment journey. }
+        expiresAt: { type: string, format: date-time }
     PaymentWebhook:
       type: object
       required: [event_id, type, data]
