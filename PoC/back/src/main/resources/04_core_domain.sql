@@ -22,6 +22,7 @@ DROP TABLE IF EXISTS currency CASCADE;
 -- ////////////////////////////////////////////////////////////////////////////
 CREATE TABLE IF NOT EXISTS vehicle (
     id BIGSERIAL PRIMARY KEY,
+    vehicle_uuid uuid NOT NULL DEFAULT gen_random_uuid(),
     reference VARCHAR(100) NULL,
     make VARCHAR(100) NULL,
     model VARCHAR(100) NULL,
