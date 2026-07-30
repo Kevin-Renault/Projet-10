@@ -1,20 +1,18 @@
 # PoC tchat - Your Car Your Way
 
-Cette preuve de concept démontre le parcours d'un tchat entre un client et un agent. Elle couvre uniquement la fonctionnalité de tchat et ne constitue pas l'application complète de réservation.
-
 ## Sommaire
 
 - [**Introduction**](#introduction)
+    - [Quick-start (5 minutes)](#quick-start-5-minutes)
     - [Périmètre de la PoC](#périmètre-de-la-poc)
+        - [Sessions et authentification](#sessions-et-authentification)
+        - [Limites de la PoC](#limites-de-la-poc)
     - [Technologies utilisées](#technologies-utilisées)
 
 - [**Installation**](#installation)
     - [Prérequis](#prérequis)
     - [Récupérer le projet](#récupérer-le-projet)
-    - [Initialiser PostgreSQL](#initialiser-postgresql)
-        - [Développement local uniquement](#développement-local-uniquement)
-        - [Environnement persistant hors développement local](#environnement-persistant-hors-développement-local)
-        - [Initialisation automatique par Spring](#initialisation-automatique-par-spring)
+    - [Initialiser PostgreSQL via Docker Desktop](#initialiser-postgresql-via-docker-desktop)
     - [Démarrer le backend](#démarrer-le-backend)
     - [Démarrer le frontend](#démarrer-le-frontend)
         - [Mode mock](#mode-mock)
@@ -25,7 +23,7 @@ Cette preuve de concept démontre le parcours d'un tchat entre un client et un a
     - [Parcours de validation](#parcours-de-validation)
         - [Parcours client et agent](#parcours-client-et-agent)
         - [Parcours de libération et de reprise](#parcours-de-libération-et-de-reprise)
-        - [Controle des droits](#controle-des-droits)
+        - [Contrôle des droits](#contrôle-des-droits)
 
 - [**API du tchat**](#api-du-tchat)
     - [Contrat OpenAPI](#contrat-openapi)
@@ -38,8 +36,11 @@ Cette preuve de concept démontre le parcours d'un tchat entre un client et un a
     - [Backend](#backend)
 
 - [Structure réelle de la PoC](#structure-réelle-de-la-poc)
+- [Limites avant production](#limites-avant-production)
 
 ## Introduction
+
+Cette preuve de concept démontre le parcours d'un tchat entre un client et un agent. Elle couvre uniquement la fonctionnalité de tchat et ne constitue pas l'application complète de réservation.
 
 ## Quick-start (5 minutes)
 
@@ -51,12 +52,12 @@ git clone https://github.com/Kevin-Renault/Projet-10.git
 Set-Location Projet-10\PoC
 ```
 
-2. Préparer les variables d'environnement pour l'application
+2. Préparer la configuration locale Docker et JWT
 
 ```powershell
 # Copier l'exemple et éditer les secrets locaux (ne PAS committer back/.env)
 copy back\.env.example back\.env
-notepad back\.env    # éditer DB_PASSWORD et JWT_SECRET
+notepad back\.env    # éditer POSTGRES_PASSWORD et JWT_SECRET
 ```
 
 3. Démarrer PostgreSQL et initialiser la base (utilise les valeurs de `back/.env`)
@@ -65,8 +66,8 @@ notepad back\.env    # éditer DB_PASSWORD et JWT_SECRET
 # Recommended: use docker compose to start Postgres and run the SQL init scripts
 docker compose -f docker-compose.yml up -d --build
 
-# Follow Postgres logs (will show initialization progress)
-docker compose -f docker-compose.yml logs -f postgres
+# Consulter les derniers logs PostgreSQL sans bloquer le terminal
+docker compose -f docker-compose.yml logs --tail 100 postgres
 
 # If you need a clean re-init, stop and remove volumes first:
 # docker compose -f docker-compose.yml down -v
@@ -126,13 +127,12 @@ Notes et bonnes pratiques
     ```
 - Pour nettoyer :
     ```powershell
-    docker rm -f postgres18
-    docker volume rm pgdata
+    docker compose -f docker-compose.yml down -v
     ```
 
-### Périmètre de la PoC
+## Périmètre de la PoC
 
-#### Fonctionnel
+### Fonctionnel
 
 Un client peut :
 - se connecter de façon sécurisée en tant que client
@@ -150,7 +150,7 @@ Un agent peut :
 - libérer une conversation attribuée
 - se déconnecter
 
-#### Implémentation technique
+### Implémentation technique
 
 Cette section décrit comment la PoC réalise les fonctions listées ci‑dessus (emplacement du code, choix d'implémentation). Pour la liste des bibliothèques et versions, voir **Technologies utilisées**.
 
@@ -161,7 +161,7 @@ Cette section décrit comment la PoC réalise les fonctions listées ci‑dessus
 - Sécurité & authentification : mécanisme d'authentification et sessions détaillé dans la sous‑section **Sessions et authentification** ci‑dessous.
 - Tests & validation : le front/back contiennent des suites unitaires et E2E (Jest/Cypress côté frontend, JUnit côté backend) — voir la section *Tests et build*.
 
-#### Relation avec le CDC et ses releases
+### Relation avec le CDC et ses releases
 
 Le CDC décrit le produit cible et organise ses fonctionnalités par livraisons : un lot préparatoire regroupe le socle sécurisé (US-14, US-15 et US-16), la Release 1 regroupe le MVP de réservation (US-01 à US-07) et la Release 2 regroupe l'historique, la modification de réservation, l'intégration agence, l'internationalisation et les services tiers (US-08, US-09, US-10, US-11, US-13 et US-17). Un lot technique distinct, déjà démontré par cette PoC, couvre le tchat client-agent (US-18).
 
@@ -169,7 +169,7 @@ Cette PoC ne constitue pas l'implémentation complète de ces releases. Elle val
 
 Les fonctionnalités de réservation, de paiement et d'infrastructure distribuée décrites dans le CDC et l'architecture cible restent hors du périmètre implémenté de cette PoC.
 
-##### Sessions et authentification
+#### Sessions et authentification
 
 - Mécanisme : la PoC utilise un access token JWT pour l'authentification des requêtes et un refresh token opaque pour prolonger la session.
 - Cookies : les deux tokens sont envoyés au client en cookies `HttpOnly` (impossibles à lire depuis JavaScript). Le refresh cookie est limité au chemin `/api/auth`.
@@ -180,13 +180,13 @@ Les fonctionnalités de réservation, de paiement et d'infrastructure distribué
 - Frontend : `AuthService.initSession()` tente de récupérer `/api/auth/me`; si le token d'accès est expiré il appelle `/api/auth/refresh` puis retente `/me`. Un intercepteur (`RefreshOn401Interceptor`) déclenche automatiquement `/api/auth/refresh` sur `401` et réessaie la requête.
 - CSRF : endpoint `/api/auth/csrf` initialise le cookie `XSRF-TOKEN` et le backend expose le token via l'en-tête `X-XSRF-TOKEN` pour les clients.
 
-#### Limites connues
+### Limites de la PoC
 
 La PoC n'implémente pas le parcours de réservation, le paiement ni l'infrastructure distribuée (Redis, RabbitMQ, Kubernetes) ou une supervision de production. En revanche, elle permet de valider les choix technologiques cibles (Java 21, Spring Boot, Angular, PostgreSQL) sur les parcours fonctionnels montrés dans cette PoC.
 
 
 
-### Technologies utilisées
+## Technologies utilisées
 
 | Composant | Technologie |
 | --- | --- |
@@ -208,7 +208,7 @@ Installer :
 
 - Java 21 — Temurin (Adoptium) : https://adoptium.net/temurin/releases/?version=21
 - Node.js (LTS) et npm : https://nodejs.org/en/download/
-- PostgreSQL 18 (stable) : https://www.postgresql.org/download/
+- Docker Desktop (avec Docker Compose) : https://www.docker.com/products/docker-desktop/
 - Git : https://git-scm.com/downloads
 
 Vérifier les installations :
@@ -217,10 +217,11 @@ Vérifier les installations :
 java -version
 node --version
 npm --version
-psql --version
+docker --version
+docker compose version
 ```
 
-Le backend attend PostgreSQL sur `localhost:5432`. L'utilisateur PostgreSQL doit pouvoir se connecter à la base et, lors de la première installation, créer l'extension `pgcrypto`.
+Docker Desktop doit être démarré avant l'exécution des commandes Docker Compose.
 
 ### Récupérer le projet
 
@@ -231,45 +232,24 @@ Set-Location Projet-10\PoC
 
 Si le dépôt est déjà présent, se placer directement dans le dossier `PoC`.
 
-### Initialiser PostgreSQL
+### Initialiser PostgreSQL via Docker Desktop
 
-Créer une base vide :
-
-```powershell
-createdb -U postgres ycyw_poc
-```
-
-Le backend lit sa configuration dans les variables d'environnement. Elles doivent être définies avant son démarrage, dans le même environnement que celui qui exécute Maven.
-
-#### Développement local uniquement
-
-Pour un test local rapide, définir les variables dans le terminal PowerShell qui lancera le backend :
+PostgreSQL est fourni par le conteneur Docker Compose. Depuis le dossier `PoC`, recopier d'abord `back/.env.example` vers `back/.env`, renseigner les secrets locaux, puis lancer :
 
 ```powershell
-$env:DB_YCYW_NAME = "ycyw_poc"
-$env:DB_USER = "postgres"
-$env:DB_PASSWORD = "mot-de-passe-local"
-$env:JWT_SECRET = "cle-locale-de-developpement-d-au-moins-32-caracteres"
+docker compose -f docker-compose.yml up -d --build
+docker compose -f docker-compose.yml logs --tail 100 postgres
 ```
 
-Cette méthode est pratique pour le développement local : les variables restent disponibles uniquement dans ce terminal et les processus lancés depuis celui-ci. Elles disparaissent lorsque le terminal est fermé. Ne pas utiliser de mots de passe ou de secrets réels dans ce fichier ou dans un script versionné.
-
-#### Environnement persistant hors développement local
-
-Pour une installation persistante sur Windows, définir les variables d'environnement au niveau du système ou du compte utilisateur, puis redémarrer le terminal et les services concernés. Par exemple, depuis un terminal PowerShell ouvert avec les droits nécessaires :
+Les scripts SQL sont exécutés automatiquement lors de la création du volume PostgreSQL. Ils ne sont pas relancés par le backend Spring. Pour une réinitialisation complète, arrêter les services et supprimer le volume :
 
 ```powershell
-[Environment]::SetEnvironmentVariable("DB_YCYW_NAME", "ycyw_poc", "Machine")
-[Environment]::SetEnvironmentVariable("DB_USER", "postgres", "Machine")
-[Environment]::SetEnvironmentVariable("DB_PASSWORD", "<mot-de-passe-a-fournir-hors-du-depot>", "Machine")
-[Environment]::SetEnvironmentVariable("JWT_SECRET", "<secret-a-fournir-hors-du-depot>", "Machine")
+docker compose -f docker-compose.yml down -v
 ```
 
-Le niveau `Machine` concerne tous les utilisateurs et peut nécessiter des droits administrateur. Pour limiter la configuration au compte courant, remplacer `Machine` par `User`.
+Le backend lit les variables de connexion et de sécurité dans `back/.env`. Ne pas committer ce fichier ni y placer de secrets réels.
 
-Dans un environnement de production, ne pas stocker les secrets en clair dans les variables système, un script, le dépôt ou la documentation. Utiliser le gestionnaire de secrets fourni par l'infrastructure de déploiement, puis injecter les valeurs au démarrage de l'application.
-
-Ne pas committer ces valeurs. Le backend utilise aussi, si nécessaire, les variables optionnelles suivantes :
+Le backend utilise aussi, si nécessaire, les variables optionnelles suivantes :
 
 | Variable | Valeur par défaut | Utilisation |
 | --- | --- | --- |
@@ -280,40 +260,9 @@ Ne pas committer ces valeurs. Le backend utilise aussi, si nécessaire, les vari
 | `JWT_COOKIE_SECURE` | `false` | Cookie HTTPS ou non |
 | `JWT_COOKIE_SAMESITE` | `Lax` | Politique SameSite |
 
-#### Initialisation locale par Spring (optionnelle)
-
-Par défaut, Spring n'exécute aucun script SQL au démarrage :
-
-```properties
-spring.sql.init.mode=never
-```
-
-Pour demander exceptionnellement à Spring d'exécuter les scripts SQL depuis
-`back/src/main/resources`, remplacer cette valeur par :
-
-```properties
-spring.sql.init.mode=always
-```
-
-Les scripts concernés sont :
-
-```text
-00_extensions_and_settings.sql
-01_acriss_vehicle.sql
-02_types_enums.sql
-03_auth_schema.sql
-04_core_domain.sql
-05_chat.sql
-07_indexes_constraints.sql
-08_reference_data.sql
-09_person_seed.sql
-```
-
-Le script `06_triggers_and_functions.sql` n'est pas exécuté par le séparateur SQL Spring, car il contient des blocs PL/pgSQL. Pour appliquer l'ensemble du schéma, utiliser le script `Livrables/Database/apply_all.ps1`.
-
 ### Démarrer le backend
 
-Depuis `back`, après avoir défini les variables PostgreSQL et JWT :
+Depuis `back`, après avoir démarré le conteneur PostgreSQL :
 
 ```powershell
 Set-Location back
@@ -321,37 +270,6 @@ Set-Location back
 ```
 
 Le backend démarre sur `http://localhost:8080`.
-
-### Profils Spring Boot (docker vs local)
-
-Ce projet fournit deux fichiers de configuration complémentaires pour faciliter l'exécution selon l'environnement :
-
-- `back/src/main/resources/application-docker.properties` : utilisé quand l'application tourne avec Docker Compose. Il connecte la JVM au service Postgres du réseau Docker (hôte `postgres`) et lit les variables `POSTGRES_*` fournies par `back/.env` ou `docker-compose`.
-- `back/src/main/resources/application-local.properties` : utilisé pour le développement local avec PostgreSQL accessible sur `localhost`. Il utilise les variables `DB_YCYW_NAME`, `DB_USER` et `DB_PASSWORD` (ou des valeurs de secours définies dans le fichier).
-
-Comment lancer avec un profil :
-
-- Lancer depuis un shell (profil `local`) :
-
-```powershell
-# profil local (Postgres sur localhost)
-Set-Location back
-.\mvnw.cmd -Dspring-boot.run.profiles=local spring-boot:run
-```
-
-- Lancer avec Docker Compose (profil `docker`) :
-
-```powershell
-# démarrer Postgres via docker-compose
-docker compose -f docker-compose.yml up -d
-
-# lancer le backend en demandant explicitement le profil docker
-Set-Location back
-.\mvnw.cmd -Dspring-boot.run.profiles=docker spring-boot:run
-```
-
-Avec Docker, une autre option est d'exporter `SPRING_PROFILES_ACTIVE=docker` dans la configuration d'environnement du service `back` dans `docker-compose.yml` — cependant, la méthode ci‑dessus (passage de profil par l'option Maven) est non destructive et simple pour tester.
-
 
 ### Démarrer le frontend
 
@@ -433,7 +351,7 @@ Lorsqu'une conversation est `assigned`, le champ `assignedAgentId` contient l'id
 3. Vérifier que la conversation revient dans `En attente`.
 4. Cliquer sur `Prendre` pour vérifier qu'elle peut être reprise.
 
-### Controle des droits
+### Contrôle des droits
 
 1. Attribuer une conversation à `agent_01@gmail.com`.
 2. Se connecter avec `agent_02@gmail.com`.
@@ -475,7 +393,7 @@ Les routes d'authentification utilisées par le frontend sont exposées sous `/a
 
 Les requêtes modifiantes utilisent les cookies d'authentification et le header CSRF géré par le frontend. Les cookies ne sont pas lus directement par le code Angular.
 
-### Contrat OpenAPI de la PoC (`openapi-poc.yaml`)
+### Contrat OpenAPI
 
 Le fichier [`openapi-poc.yaml`](openapi-poc.yaml) est le contrat versionné de l'API de la PoC au format OpenAPI 3.0.3. Il décrit les échanges attendus entre le frontend et le backend de la PoC :
 
@@ -615,7 +533,7 @@ PoC/
 
 Les scripts SQL et le script d'application du schéma se trouvent dans [Livrables/Database](../Livrables/Database). Les documents d'architecture du projet sont conservés dans `Livrables/`, mais ils ne décrivent pas des composants installés dans cette PoC.
 
-## Limites connues
+## Limites avant production
 
 Cette PoC est une démonstration fonctionnelle locale. Elle n'utilise pas de migrations versionnées, de gestion de secrets de production, de scalabilité horizontale, de broker de messages ou de supervision complète des flux SSE.
 

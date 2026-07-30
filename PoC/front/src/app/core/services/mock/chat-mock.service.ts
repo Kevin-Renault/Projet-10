@@ -23,9 +23,9 @@ export class ChatMockService implements ChatDataSource {
             chatUuid: '00000000-0000-4000-8000-000000000001',
             subject: 'Accompagnement Java',
             bookingId: null,
-            createdBy: 1,
+            createdBy: 3,
             status: 'assigned',
-            assignedAgentId: 2,
+            assignedAgentId: 1,
             createdAt: '2024-02-01T09:00:00Z',
             updatedAt: '2024-02-02T14:30:00Z'
         },
@@ -34,7 +34,7 @@ export class ChatMockService implements ChatDataSource {
             chatUuid: '00000000-0000-4000-8000-000000000002',
             subject: 'Question sur Angular',
             bookingId: null,
-            createdBy: 2,
+            createdBy: 4,
             status: 'open',
             assignedAgentId: null,
             createdAt: '2024-02-03T10:00:00Z',
@@ -46,7 +46,7 @@ export class ChatMockService implements ChatDataSource {
         {
             id: 1,
             chatId: 1,
-            senderId: 1,
+            senderId: 3,
             contentType: 'text',
             content: 'Bonjour, je voudrais revoir les bases de Java.',
             status: 'sent',
@@ -66,7 +66,7 @@ export class ChatMockService implements ChatDataSource {
         {
             id: 3,
             chatId: 2,
-            senderId: 2,
+            senderId: 4,
             contentType: 'text',
             content: 'Pouvez-vous m aider sur les composants Angular ?',
             status: 'sent',
@@ -76,9 +76,9 @@ export class ChatMockService implements ChatDataSource {
     ];
 
     private readonly participants: ChatParticipant[] = [
-        { id: 1, chatId: 1, userId: 1, role: 'client', joinedAt: '2024-02-01T09:00:00Z', leftAt: null },
-        { id: 2, chatId: 1, userId: 2, role: 'agent', joinedAt: '2024-02-01T09:00:00Z', leftAt: null },
-        { id: 3, chatId: 2, userId: 1, role: 'client', joinedAt: '2024-02-03T10:00:00Z', leftAt: null },
+        { id: 1, chatId: 1, userId: 3, role: 'client', joinedAt: '2024-02-01T09:00:00Z', leftAt: null },
+        { id: 2, chatId: 1, userId: 1, role: 'agent', joinedAt: '2024-02-01T09:00:00Z', leftAt: null },
+        { id: 3, chatId: 2, userId: 4, role: 'client', joinedAt: '2024-02-03T10:00:00Z', leftAt: null },
     ];
 
     private get currentUserId(): number {
