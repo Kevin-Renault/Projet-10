@@ -19,6 +19,7 @@ paths:
     get:
       tags: [Authentication]
       summary: Get a CSRF token
+      security: []
       responses:
         '204':
           description: CSRF token issued
@@ -29,6 +30,7 @@ paths:
     post:
       tags: [Authentication]
       summary: Register a user
+      security: []
       parameters: [{ $ref: '#/components/parameters/CsrfHeader' }]
       requestBody:
         required: true
@@ -47,6 +49,7 @@ paths:
     post:
       tags: [Authentication]
       summary: Authenticate a user
+      security: []
       parameters: [{ $ref: '#/components/parameters/CsrfHeader' }]
       requestBody:
         required: true
@@ -96,12 +99,45 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/User' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      tags: [Authentication]
+      summary: Delete the current user account
+      description: Deletes the authenticated account after password confirmation.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/CsrfHeader' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeleteAccountRequest' }
+      responses:
+        '204': { description: Account deleted }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/auth/verify-email:
+    post:
+      tags: [Authentication]
+      summary: Verify an email address
+      description: Activates a pending account with a valid, single-use verification code.
+      security: []
+      parameters: [{ $ref: '#/components/parameters/CsrfHeader' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VerifyEmailRequest' }
+      responses:
+        '204': { description: Email address verified and account activated }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   /api/env:
     get:
       tags: [Target platform]
       summary: Get the runtime environment
       description: Public diagnostic endpoint exposed by the PoC.
+      security: []
       responses:
         '200':
           description: Runtime environment information
@@ -110,6 +146,108 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+
+  /api/agencies:
+    get:
+      tags: [Target platform]
+      summary: List rental agencies
+      description: Returns agencies with their address and opening hours.
+      security: []
+      responses:
+        '200':
+          description: Agencies returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Agency' }
+
+  /api/agencies/{agencyId}:
+    get:
+      tags: [Target platform]
+      summary: Get a rental agency
+      security: []
+      parameters: [{ $ref: '#/components/parameters/AgencyId' }]
+      responses:
+        '200':
+          description: Agency returned
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Agency' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/vehicles:
+    get:
+      tags: [Target platform]
+      summary: List available vehicles
+      description: Returns vehicles and their ACRISS classification.
+      security: []
+      parameters:
+        - name: agencyId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: acrissCode
+          in: query
+          schema: { type: string, pattern: '^[A-Z0-9]{4}$' }
+      responses:
+        '200':
+          description: Vehicles returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Vehicle' }
+
+  /api/offers/search:
+    get:
+      tags: [Target platform]
+      summary: Search rental offers
+      description: Searches available offers by departure, return, dates and ACRISS category.
+      security: []
+      parameters:
+        - name: pickupAgencyId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: returnAgencyId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: startAt
+          in: query
+          required: true
+          schema: { type: string, format: date-time }
+        - name: endAt
+          in: query
+          required: true
+          schema: { type: string, format: date-time }
+        - name: acrissCode
+          in: query
+          required: true
+          schema: { type: string, pattern: '^[A-Z0-9]{4}$' }
+      responses:
+        '200':
+          description: Matching offers returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Offer' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/offers/{offerId}:
+    get:
+      tags: [Target platform]
+      summary: Get an offer
+      security: []
+      parameters: [{ $ref: '#/components/parameters/OfferId' }]
+      responses:
+        '200':
+          description: Offer returned
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Offer' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /api/users:
     get:
@@ -390,6 +528,23 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
 
   /api/reservations:
+    get:
+      tags: [Target platform]
+      summary: List the current user's reservations
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, confirmed, cancelled, completed] }
+      responses:
+        '200':
+          description: Reservations returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Reservation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
     post:
       tags: [Target platform]
       summary: Create a reservation
@@ -406,14 +561,121 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Reservation' }
+
+  /api/reservations/{reservationId}:
+    get:
+      tags: [Target platform]
+      summary: Get a reservation
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ReservationId' }]
+      responses:
+        '200':
+          description: Reservation returned
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Reservation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Target platform]
+      summary: Modify a reservation
+      description: Modification is allowed only more than 48 hours before the reservation starts.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ReservationId'
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReservationUpdate' }
+      responses:
+        '200':
+          description: Reservation modified
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Reservation' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [Target platform]
+      summary: Cancel a reservation
+      description: 'Refund depends on the time before the reservation starts: 100% at least 7 days before, and 25% less than 7 days before. The 48-hour rule applies to reservation modifications, not to the refund percentage.'
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ReservationId'
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          description: Reservation cancelled and refund policy applied
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReservationCancellation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/agency/users:
+    get:
+      tags: [Target platform]
+      summary: List users for an agency application
+      description: Agency integration endpoint.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Users returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/agency/reservations:
+    get:
+      tags: [Target platform]
+      summary: List reservations for an agency application
+      description: Agency integration endpoint.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Reservations returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Reservation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/agency/vehicles:
+    get:
+      tags: [Target platform]
+      summary: List vehicles for an agency application
+      description: Agency integration endpoint.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Vehicles returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Vehicle' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /webhooks/payments:
     post:
       tags: [Target platform]
       summary: Receive a payment webhook
-      description: Target-platform contract; not implemented by the chat PoC.
-      parameters:
-        - $ref: '#/components/parameters/WebhookTimestamp'
-        - $ref: '#/components/parameters/WebhookSignature'
+      description: >-
+        Target-platform contract; not implemented by the chat PoC. The endpoint
+        accepts a provider webhook and normalizes it internally. Provider-specific
+        headers, signature verification, event names and payloads must be defined
+        after studying the official Stripe and PayPal APIs and selecting the
+        provider versions for the target implementation.
+      security: []
       requestBody:
         required: true
         content:
@@ -446,18 +708,23 @@ components:
       in: path
       required: true
       schema: { type: integer, format: int64, minimum: 1 }
+    AgencyId:
+      name: agencyId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    OfferId:
+      name: offerId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ReservationId:
+      name: reservationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     CsrfHeader:
       name: X-XSRF-TOKEN
-      in: header
-      required: true
-      schema: { type: string }
-    WebhookTimestamp:
-      name: X-WC-Timestamp
-      in: header
-      required: true
-      schema: { type: integer, format: int64 }
-    WebhookSignature:
-      name: X-WC-Signature
       in: header
       required: true
       schema: { type: string }
@@ -475,20 +742,34 @@ components:
   schemas:
     RegisterRequest:
       type: object
-      required: [username, email, password]
+      required: [email, password, firstName, lastName, dateOfBirth, address]
       properties:
-        username: { type: string, maxLength: 100 }
         email: { type: string, format: email, maxLength: 254 }
         password:
           type: string
           minLength: 8
           description: Must contain upper/lower-case letters, a digit and a special character.
+        firstName: { type: string, maxLength: 100 }
+        lastName: { type: string, maxLength: 100 }
+        dateOfBirth: { type: string, format: date }
+        address: { type: string, maxLength: 500 }
     LoginRequest:
       type: object
       required: [email, password]
       properties:
         email: { type: string, format: email, maxLength: 254 }
         password: { type: string, maxLength: 72 }
+    DeleteAccountRequest:
+      type: object
+      required: [password]
+      properties:
+        password: { type: string, maxLength: 72 }
+    VerifyEmailRequest:
+      type: object
+      required: [email, code]
+      properties:
+        email: { type: string, format: email, maxLength: 254 }
+        code: { type: string, minLength: 1, maxLength: 20 }
     AuthResponse:
       type: object
       required: [token, user]
@@ -549,7 +830,7 @@ components:
     ChatText:
       type: object
       properties:
-        id: { type: integer, format: int64 }
+        id: { type: string, format: uuid, description: 'Public message UUID; internal database id is not exposed.' }
         chatId: { type: integer, format: int64 }
         senderId: { type: integer, format: int64 }
         contentType: { type: string }
@@ -557,27 +838,102 @@ components:
         status: { type: string }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+    Agency:
+      type: object
+      required: [id, name, city, address, openingHours]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        city: { type: string }
+        address: { type: string }
+        openingHours:
+          type: array
+          items: { $ref: '#/components/schemas/OpeningHour' }
+    OpeningHour:
+      type: object
+      required: [dayOfWeek, opensAt, closesAt]
+      properties:
+        dayOfWeek: { type: integer, minimum: 0, maximum: 6 }
+        opensAt: { type: string, format: time }
+        closesAt: { type: string, format: time }
+    Vehicle:
+      type: object
+      required: [id, acrissCode, make, model, seats, status]
+      properties:
+        id: { type: string, format: uuid, description: 'Public vehicle UUID; internal database id is not exposed.' }
+        acrissCode: { type: string, pattern: '^[A-Z0-9]{4}$' }
+        make: { type: string }
+        model: { type: string }
+        variant: { type: string }
+        seats: { type: integer, minimum: 1 }
+        status: { type: string, enum: [available, reserved, maintenance, retired] }
+        acrissDetails: { $ref: '#/components/schemas/AcrissDetails' }
+    AcrissDetails:
+      type: object
+      properties:
+        category: { type: string }
+        vehicleType: { type: string }
+        transmissionDrive: { type: string }
+        fuelAirConditioning: { type: string }
+        passengerVanDescription: { type: string }
+    Offer:
+      type: object
+      required: [id, vehicle, agency, dailyPrice, currency, available]
+      properties:
+        id: { type: string, format: uuid }
+        vehicle: { $ref: '#/components/schemas/Vehicle' }
+        agency: { $ref: '#/components/schemas/Agency' }
+        dailyPrice: { type: number, format: float, minimum: 0 }
+        currency: { type: string, minLength: 3, maxLength: 3 }
+        available: { type: boolean }
+        availableFrom: { type: string, format: date-time }
+        availableTo: { type: string, format: date-time }
     ReservationCreate:
       type: object
-      required: [vehicleId, startDate, endDate]
+      required: [offerId, startDate, endDate]
       properties:
-        vehicleId: { type: string }
+        offerId: { type: string, format: uuid }
         startDate: { type: string, format: date-time }
         endDate: { type: string, format: date-time }
-        pickupAgencyId: { type: string }
-        returnAgencyId: { type: string }
+        pickupAgencyId: { type: string, format: uuid }
+        returnAgencyId: { type: string, format: uuid }
+    ReservationUpdate:
+      type: object
+      required: [startDate, endDate]
+      properties:
+        offerId: { type: string, format: uuid }
+        startDate: { type: string, format: date-time }
+        endDate: { type: string, format: date-time }
+        pickupAgencyId: { type: string, format: uuid }
+        returnAgencyId: { type: string, format: uuid }
     Reservation:
       type: object
+      required: [id, offerId, status, startDate, endDate, totalPrice, currency]
       properties:
-        id: { type: string }
-        status: { type: string }
-        totalPrice: { type: number, format: float }
-        currency: { type: string }
+        id: { type: string, format: uuid }
+        offerId: { type: string, format: uuid }
+        status: { type: string, enum: [pending, confirmed, cancelled, completed] }
+        startDate: { type: string, format: date-time }
+        endDate: { type: string, format: date-time }
+        pickupAgencyId: { type: string, format: uuid }
+        returnAgencyId: { type: string, format: uuid }
+        totalPrice: { type: number, format: float, minimum: 0 }
+        currency: { type: string, minLength: 3, maxLength: 3 }
+    ReservationCancellation:
+      type: object
+      required: [reservation, refundPercentage, refundAmount, refundCurrency, refundStatus]
+      properties:
+        reservation: { $ref: '#/components/schemas/Reservation' }
+        refundPercentage: { type: integer, enum: [25, 100] }
+        refundAmount: { type: number, format: float, minimum: 0 }
+        refundCurrency: { type: string, minLength: 3, maxLength: 3 }
+        refundStatus: { type: string, enum: [not_refunded, pending, processed, failed] }
+        refundPolicyCode: { type: string, maxLength: 50, description: Reference code of the policy applied to the cancellation. }
     PaymentWebhook:
       type: object
       required: [event_id, type, data]
       properties:
-        event_id: { type: string }
-        type: { type: string }
-        created: { type: integer, format: int64 }
-        data: { type: object, additionalProperties: true }
+        event_id: { type: string, description: Provider event identifier; provider-specific naming may differ. }
+        type: { type: string, description: Provider event type before internal normalization. }
+        created: { type: integer, format: int64, description: Provider event timestamp when available. }
+        data: { type: object, additionalProperties: true, description: Provider payload before internal normalization. }

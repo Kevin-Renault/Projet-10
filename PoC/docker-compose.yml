@@ -1,0 +1,51 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:18
+    container_name: postgres18
+    env_file:
+      - back/.env
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-ycyw_poc}"
+      POSTGRES_USER: "${POSTGRES_USER:-app_user}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-change_me_locally}"
+      # Backwards/compatibility keys used by the Spring app
+      DB_YCYW_NAME: "${DB_YCYW_NAME:-${POSTGRES_DB:-ycyw_poc}}"
+      DB_USER: "${DB_USER:-${POSTGRES_USER:-app_user}}"
+      DB_PASSWORD: "${DB_PASSWORD:-${POSTGRES_PASSWORD:-change_me_locally}}"
+      # When services run in the same compose network, the DB host should be the service name
+      DB_HOST: "${DB_HOST:-postgres}"
+      DB_PORT: "${DB_PORT:-5432}"
+      # JWT / app settings (defaults mirror .env.example / application.properties)
+      JWT_SECRET: "${JWT_SECRET:-local-development-jwt-secret-change-me-2026}"
+      JWT_EXPIRATION_SECONDS: "${JWT_EXPIRATION_SECONDS:-900}"
+      JWT_REFRESH_EXPIRATION_SECONDS: "${JWT_REFRESH_EXPIRATION_SECONDS:-2592000}"
+      JWT_COOKIE_SECURE: "${JWT_COOKIE_SECURE:-false}"
+      JWT_COOKIE_SAMESITE: "${JWT_COOKIE_SAMESITE:-Lax}"
+    ports:
+      - "5432:5432"
+    volumes:
+      # For Postgres 18 the recommended mount point is /var/lib/postgresql
+      - pgdata:/var/lib/postgresql
+      # Initialize the DB on first run using the numbered SQL files.
+      # base.sql is intentionally excluded: it creates a separate database/user.
+      - ./back/src/main/resources/00_extensions_and_settings.sql:/docker-entrypoint-initdb.d/00_extensions_and_settings.sql:ro
+      - ./back/src/main/resources/01_acriss_vehicle.sql:/docker-entrypoint-initdb.d/01_acriss_vehicle.sql:ro
+      - ./back/src/main/resources/02_types_enums.sql:/docker-entrypoint-initdb.d/02_types_enums.sql:ro
+      - ./back/src/main/resources/03_auth_schema.sql:/docker-entrypoint-initdb.d/03_auth_schema.sql:ro
+      - ./back/src/main/resources/04_core_domain.sql:/docker-entrypoint-initdb.d/04_core_domain.sql:ro
+      - ./back/src/main/resources/05_chat.sql:/docker-entrypoint-initdb.d/05_chat.sql:ro
+      - ./back/src/main/resources/06_triggers_and_functions.sql:/docker-entrypoint-initdb.d/06_triggers_and_functions.sql:ro
+      - ./back/src/main/resources/07_indexes_constraints.sql:/docker-entrypoint-initdb.d/07_indexes_constraints.sql:ro
+      - ./back/src/main/resources/08_reference_data.sql:/docker-entrypoint-initdb.d/08_reference_data.sql:ro
+      - ./back/src/main/resources/09_person_seed.sql:/docker-entrypoint-initdb.d/09_person_seed.sql:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\"" ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  pgdata:
+    name: projet10_pgdata

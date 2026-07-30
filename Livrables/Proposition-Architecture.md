@@ -95,20 +95,36 @@ Cette section décrit l'état final visé après la migration. Les applications 
 #### 2.1.2 Justification des choix
 
 - **Frontend :** Angular est retenu pour structurer une interface web TypeScript maintenable, compatible avec les exigences d'accessibilité, d'internationalisation et de tests du projet.
+
 - **Backend :** Spring Boot et Java 21 sont retenus pour structurer une API REST robuste, avec validation des entrées, gestion de la sécurité, prise en charge des transactions métier et outillage de tests adapté.
+
 - **API :** REST JSON et OpenAPI 3.0 sont retenus pour formaliser les échanges, faciliter l'intégration des clients et documenter le contrat d'API.
+
 - **Intégration des systèmes existants :** Les APIs nationales étant limitées, hétérogènes et non unifiées, des connecteurs temporaires permettront d'intégrer progressivement les systèmes existants sans exposer directement leurs bases au frontend.
+
 - **Base de données et cache :**
   - **Choix SQL :** Une base SQL est retenue comme source de vérité principale plutôt qu'une base NoSQL, car le domaine comporte de nombreuses relations entre utilisateurs, agences, véhicules, offres, réservations et paiements. Les transactions ACID, les contraintes d'intégrité référentielle et la normalisation 3NF sont nécessaires pour garantir la cohérence des données métier et éviter les doublons.
+
     - **Alternative NoSQL :** MongoDB, Cassandra ou DynamoDB pourraient répondre à des besoins documentaires, distribués ou fortement scalables. Ils sont toutefois moins adaptés au modèle principal, car leurs mécanismes de relations et de contraintes référentielles sont moins naturels pour les transactions multi-entités nécessaires à une réservation et à son paiement.
+
   - **PostgreSQL :** PostgreSQL est retenu parmi les bases SQL pour ses fonctionnalités SQL avancées, sa gestion des contraintes, ses transactions ACID et sa bonne adéquation avec le modèle métier strictement normalisé.
+
     - **Alternatives SQL :** MySQL ou MariaDB pourraient couvrir une grande partie du besoin relationnel. Ils restent techniquement possibles, mais PostgreSQL est privilégié pour ses fonctionnalités avancées et sa bonne adéquation avec les contraintes du modèle retenu.
+
   - **Cache :** Redis est retenu uniquement pour le cache et les données temporaires de session afin de réduire la charge sur PostgreSQL ; il ne remplace pas la base relationnelle source de vérité.
+
 - **Accès et répartition :** Un reverse proxy / API Gateway est retenu comme point d'entrée HTTPS pour protéger les conteneurs internes, router les requêtes et répartir la charge vers les instances frontend et backend disponibles.
+
 - **Traitements asynchrones :** RabbitMQ est retenu pour découpler les traitements asynchrones de l'API. La file permet d'absorber les pics, de réessayer les tâches en erreur et de faire évoluer le nombre de workers indépendamment du nombre d'instances API.
+
 - **Authentification et sécurité :** Les JWT à courte durée de vie, les refresh tokens et le stockage des secrets dans un vault sont retenus pour sécuriser les accès et limiter l'exposition des informations sensibles.
-- **Paiement :** Stripe et PayPal sont retenus comme fournisseurs de paiement externalisé complémentaires. Stripe permet notamment le paiement par carte bancaire et la gestion de moyens de paiement numériques via une intégration structurée, tandis que PayPal répond aux utilisateurs souhaitant payer depuis leur portefeuille PayPal. Les deux solutions fournissent des APIs, des SDKs et des mécanismes de notification permettant de confirmer les paiements sans stocker les numéros de carte dans l'application.
+
+- **Paiement :** Stripe et PayPal sont retenus comme fournisseurs de paiement externalisé complémentaires. Stripe permet notamment le paiement par carte bancaire et la gestion de moyens de paiement numériques via une intégration structurée, tandis que PayPal répond aux utilisateurs souhaitant payer depuis leur portefeuille PayPal.
+
+  Les deux solutions fournissent des APIs, des SDKs et des mécanismes de notification permettant de confirmer les paiements sans stocker les numéros de carte dans l'application. Pour PayPal, le cadrage s'appuie sur Orders v2, Payments v2 et Webhooks Management v1 ; le périmètre exact des APIs et événements sera confirmé lors du choix du flux de première livraison.
+
 - **Déploiement :** Les conteneurs Docker orchestrés par Kubernetes ou exécutés sur App Services, avec une chaîne CI/CD GitHub Actions, permettent de déployer et de faire évoluer les composants de manière reproductible.
+
 - **Observabilité :** Prometheus, Grafana, les logs centralisés et OpenTelemetry sont retenus pour suivre séparément les performances de l'API, la consommation de la file, les traitements des workers et les erreurs de l'ensemble de la plateforme.
 
 ### 2.2 Intégrations et services tiers
@@ -116,13 +132,67 @@ Cette section décrit l'état final visé après la migration. Les applications 
 #### 2.2.1 Paiement et notifications
 
 - Le backend transmet uniquement les données nécessaires aux fournisseurs de paiement ; le frontend ne les appelle pas directement et aucune donnée bancaire sensible n'est stockée.
-- Les webhooks entrants sont vérifiés par signature et horodatage, puis dédupliqués avec le couple fournisseur / identifiant d'événement.
+
+- Chaque fournisseur est intégré derrière un adaptateur dédié qui traduit ses événements vers l'enveloppe interne normalisée définie dans le contrat webhook.
+
+- Pour PayPal, l'adaptateur prend en charge les notifications du flux retenu parmi Orders v2 / Payments v2, notamment les événements d'autorisation, de capture et de remboursement. Les événements sont identifiés par leur `event_type` et leur identifiant d'événement ; la ressource PayPal embarquée et sa version sont conservées pour permettre le rapprochement avec le paiement interne.
+
+- Le périmètre PayPal initial à étudier couvre `PAYMENT.AUTHORIZATION.CREATED`, `PAYMENT.AUTHORIZATION.VOIDED`, `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.DECLINED`, `PAYMENT.CAPTURE.PENDING`, `PAYMENT.CAPTURE.REFUNDED`, `PAYMENT.CAPTURE.REVERSED`, `PAYMENT.REFUND.PENDING` et `PAYMENT.REFUND.FAILED`. `CHECKOUT.ORDER.APPROVED` peut être utilisé pour suivre l'approbation du parcours Orders v2, mais ne constitue pas à lui seul une confirmation de paiement capturé.
+
+- Pour PayPal, l'authenticité est vérifiée à partir des informations de transmission fournies par PayPal, notamment l'identifiant de transmission, l'heure de transmission, l'URL du certificat, l'algorithme et la signature, ainsi que l'identifiant du webhook configuré. La vérification peut être effectuée localement avec le certificat PayPal ou via l'endpoint officiel de vérification ; le corps HTTP brut est conservé pour éviter une altération du contenu signé.
+
+- Les webhooks entrants sont vérifiés par le mécanisme propre à chaque fournisseur, puis dédupliqués avec le couple fournisseur / identifiant d'événement.
+
+- Après vérification et enregistrement idempotent en base, l'API répond rapidement par un statut `2xx` ; la mise à jour métier et les traitements rejouables sont exécutés de manière asynchrone par RabbitMQ et les workers. Les nouvelles tentatives du fournisseur ne doivent donc pas provoquer de double traitement.
+
+- Les événements invalides, non authentifiables ou non pris en charge sont rejetés ou classés sans effet métier, avec une journalisation technique ne contenant aucun secret.
+
 - Les erreurs du fournisseur sont journalisées sans secret, conservées dans un état métier cohérent et présentées à l'utilisateur avec un message compréhensible.
+
 - Les clés et jetons sont fournis par des variables d'environnement ou un gestionnaire de secrets, jamais par le code source.
+
+##### Séquence de réception et de vérification d’un webhook
+
+Cette séquence détaille le traitement technique commun aux fournisseurs. La vérification d'authenticité reste spécifique à chaque adaptateur ; l'enregistrement idempotent précède les traitements métier asynchrones.
+
+```mermaid
+sequenceDiagram
+  participant Provider as Fournisseur de paiement
+  participant API as Endpoint webhook
+  participant Adapter as Adaptateur fournisseur
+  participant DB as PostgreSQL
+  participant Queue as RabbitMQ
+  participant Worker as Worker métier
+
+  Provider->>API: POST webhook avec corps brut et métadonnées
+  API->>Adapter: Vérifier l'authenticité du message
+  alt Message invalide ou non pris en charge
+    Adapter-->>API: Rejet technique sans effet métier
+    API-->>Provider: Réponse d'erreur ou classement technique
+  else Message valide
+    Adapter-->>API: Enveloppe normalisée
+    API->>DB: Rechercher (provider, provider_event_id)
+    alt Événement déjà enregistré
+      DB-->>API: Doublon détecté
+      API-->>Provider: 2xx sans second traitement
+    else Nouvel événement
+      API->>DB: Enregistrer l'événement et le corps brut
+      DB-->>API: Événement enregistré
+      API->>Queue: Publier le traitement métier
+      API-->>Provider: 2xx après persistance
+      Queue->>Worker: Consommer l'événement
+      Worker->>DB: Mettre à jour paiement et réservation
+    end
+  end
+```
 
 #### 2.2.2 Sobriété numérique et impact écologique
 
 - Les réponses API sont paginées et limitées aux champs nécessaires afin de réduire les échanges réseau.
+- Les endpoints de recherche et d’historique utilisent une pagination côté serveur. La taille de page par défaut est fixée à 25 éléments et la taille maximale est plafonnée à 100 éléments.
+- L'historique utilise une période par défaut de 30 jours, que le client peut élargir explicitement avec des filtres de période. Cette valeur par défaut optimise les échanges sans limiter l'accès fonctionnel aux réservations plus anciennes.
+- Les recherches ne retournent que les champs nécessaires à la liste ; les détails complets d'une offre ou d'une réservation sont chargés séparément lors de la consultation de l'élément.
+- Les paramètres de recherche, de période, de tri et de pagination sont conservés dans l'URL ou dans un état de navigation afin qu'un rafraîchissement de page restaure la recherche en cours.
 - Les images de véhicules sont redimensionnées, compressées et servies dans un format adapté au contexte d'affichage.
 - Les contenus statiques sont mis en cache lorsque cela est pertinent.
 - L'hébergement et les services sont choisis en tenant compte de leur impact environnemental documenté et du dimensionnement réel de la première livraison.
@@ -130,11 +200,17 @@ Cette section décrit l'état final visé après la migration. Les applications 
 ### 2.3 Principes d'architecture
 
 - Le frontend Angular consomme l'API REST Spring Boot via le reverse proxy / API Gateway et HTTPS.
+
 - Le reverse proxy / API Gateway constitue le point d'entrée HTTPS, effectue le routage et répartit les requêtes vers les instances frontend et backend disponibles.
+
 - Le backend sépare les contrôleurs REST, les services métier, les accès aux données et les adaptateurs de services externes.
+
 - Les tâches longues ou rejouables sont publiées dans RabbitMQ puis consommées par des workers indépendants ; le nombre de workers peut évoluer séparément du nombre d'instances API.
+
 - PostgreSQL est la source de vérité pour les comptes, offres, réservations, paiements, webhooks et données du tchat.
+
 - Redis sert à accélérer les accès aux données temporaires et ne remplace pas PostgreSQL pour les données métier.
+
 - Les fournisseurs de paiement sont appelés uniquement par le backend ; leurs événements entrants passent par le contrat webhook avant mise à jour du domaine. Aucun autre système métier externe n'est une dépendance permanente de la cible.
 
 ### 2.4 Schéma des briques
@@ -229,6 +305,39 @@ flowchart LR
   Gateway -->|Routage API| API
 ```
 
+#### Séquence fonctionnelle d’une réservation avec paiement externe
+
+Cette vue complète le flux applicatif en montrant l'ordre métier d'une réservation, depuis la sélection de l'offre jusqu'à la confirmation reçue du fournisseur de paiement.
+
+```mermaid
+sequenceDiagram
+  participant Client as Client web
+  participant Frontend as Frontend Angular
+  participant API as API Spring Boot
+  participant Provider as Fournisseur de paiement
+  participant DB as PostgreSQL
+  participant Queue as RabbitMQ
+  participant Worker as Worker métier
+
+  Client->>Frontend: Rechercher et sélectionner une offre
+  Frontend->>API: Créer la réservation
+  API->>DB: Enregistrer la réservation pending
+  API->>Provider: Initialiser le paiement
+  Provider-->>API: Retourner l'identifiant du paiement
+  API-->>Frontend: Retourner le parcours de paiement
+  Frontend-->>Client: Afficher le paiement externe
+  Client->>Provider: Valider le paiement
+  Provider-->>API: Envoyer le webhook de confirmation
+  API->>DB: Enregistrer l'événement de façon idempotente
+  API->>Queue: Publier la confirmation
+  API-->>Provider: Répondre 2xx
+  Queue->>Worker: Consommer la confirmation
+  Worker->>DB: Confirmer le paiement et la réservation
+  Frontend->>API: Consulter l'état de la réservation
+  API-->>Frontend: Retourner l'état à jour
+  Frontend-->>Client: Afficher la confirmation
+```
+
 ### 2.6 Modèle de données
 
 #### 2.6.1 Vue d'ensemble
@@ -289,6 +398,7 @@ erDiagram
   }
   VEHICLE {
     bigint id PK
+    uuid vehicle_uuid UK
     string acriss_code
     string make
     string model
@@ -343,6 +453,7 @@ erDiagram
   }
   CHAT_TEXT {
     bigint id PK
+    uuid chat_text_uuid UK
     bigint chat_id FK
     bigint sender_id FK
     string content_type
@@ -456,6 +567,7 @@ classDiagram
   }
   class Vehicle {
     +Long id PK
+    +UUID vehicle_uuid UK
     +String acriss_code
     +String make
     +String model
@@ -509,6 +621,7 @@ classDiagram
   }
   class ChatText {
     +Long id PK
+    +UUID chat_text_uuid UK
     +Long chat_id FK
     +Long sender_id FK
     +ChatContentType content_type
@@ -614,30 +727,47 @@ Les solutions suivantes sont connues et techniquement envisageables, mais elles 
 ### 4.1 Sécurité, sessions et accessibilité
 
 - Les échanges API utilisent OpenAPI 3.0, JSON, des dates ISO 8601 UTC et des devises ISO 4217.
+
 - Les utilisateurs web sont authentifiés par JWT ; les droits sont définis selon leur rôle et leur périmètre métier. Les seuls échanges métier externes prévus concernent les fournisseurs de paiement.
+
 - Le JWT d'accès a une durée de vie courte, fixée à 15 minutes en production. Il peut être transmis dans l'en-tête `Authorization: Bearer` ou, pour les clients web, dans un cookie `access_token` `HttpOnly`, `Secure` et `SameSite=Lax`.
+
 - Le refresh token est un jeton opaque stocké dans un cookie `HttpOnly`, `Secure` et `SameSite=Lax`, limité au chemin `/api/auth`. Sa durée de vie est de 30 jours en production et sa valeur n'est jamais stockée en clair en base.
+
 - Chaque renouvellement vérifie le hash du refresh token, supprime le jeton présenté et émet un nouveau refresh token. La déconnexion révoque le refresh token en base et supprime les cookies d'accès et de renouvellement.
+
 - Les requêtes qui utilisent l'authentification par cookie sont protégées contre la CSRF : `GET /api/auth/csrf` initialise le cookie `XSRF-TOKEN` et expose sa valeur dans un en-tête de réponse ; le client la renvoie dans l'en-tête `X-XSRF-TOKEN` pour les requêtes non sûres.
+
 - Les mots de passe, tokens et secrets ne sont jamais stockés en clair ni écrits dans les journaux.
+
 - Les parcours login, réservation, paiement et profil doivent respecter les critères d'accessibilité du CDC et être vérifiés par axe-core et des tests clavier/lecteur d'écran.
 
 ### 4.2 Exigences non fonctionnelles
 
 - Disponibilité (SLA cible) : 99.9% (MTBF/MTTR planifiés) — baseline fournie dans `Contexte`.
+
 - Objectifs d'exploitation (SLO)
   - P95 latence API: < 300 ms
   - P99 latence API: < 800 ms
   - Taux d'erreur à fort trafic: < 1%
   - Capacité cible (global, dimensionnement initial) : 1 500 requêtes/s soutenues
   - MTTR objectif: < 1 heure
+
+- Pagination et collections : les endpoints de recherche et d'historique acceptent `page` et `pageSize`, utilisent une taille de page par défaut de 25 éléments et refusent une taille supérieure à 100 éléments.
+
+- Les collections sont triées de manière déterministe ; l'historique des réservations est trié par date de début décroissante par défaut.
+
+- Les filtres de période sont transmis à l'API afin d'éviter le chargement de données inutiles avant filtrage côté frontend.
+
 - Sécurité: TLS 1.2+ (préférer 1.3), cookies HttpOnly+Secure, rotation automatique des secrets.
 
 ### 4.3 Formats et contrats
 
 - OpenAPI 3.0 pour endpoints publics et internes.
 - Payloads JSON, dates en ISO8601 UTC, devises en ISO 4217.
-- Webhook contract: header de signature HMAC-SHA256, timestamp, idempotency via `event_id`.
+- Les réponses de collection sont structurées autour d'une liste `items` et de métadonnées de pagination, notamment `page`, `pageSize`, `totalItems` et `totalPages` lorsque le calcul du total est pertinent.
+- Les paramètres de recherche sont restaurables après actualisation lorsqu'ils sont présents dans l'URL. Une action explicite de réinitialisation restaure les valeurs par défaut.
+- Webhook contract: authentification et signature propres à chaque fournisseur, horodatage lorsque le fournisseur en fournit un, enveloppe interne normalisée et idempotence via le couple `provider` / `provider_event_id`.
 
 ## 5. PoC actuelle
 
@@ -678,19 +808,32 @@ La stratégie de migration décrit le chemin temporaire permettant d'intégrer l
 
 ### 6.1 Principes de migration
 
-La migration sera progressive afin de limiter les risques et d'éviter une bascule simultanée de toutes les applications nationales. La nouvelle plateforme sera mise en place à côté des systèmes existants, puis les fonctionnalités seront transférées par étapes selon leur niveau de maturité et les résultats observés.
+La migration sera progressive afin de limiter les risques et d'éviter une bascule simultanée de toutes les applications nationales.
 
-Une couche d'adaptation temporaire sera placée au plus près des bases et APIs nationales. Elle prendra la forme de connecteurs backend dédiés, chargés de lire les anciens formats, de les traduire vers le modèle de données centralisé et, si nécessaire, de transmettre les écritures selon les règles de chaque système. Le frontend central ne communiquera jamais directement avec ces bases : il passera uniquement par le backend et l'API Gateway. Cette couche ne doit pas devenir une dépendance permanente : chaque connecteur devra être documenté, observé et retiré après la migration du périmètre concerné.
+La nouvelle plateforme sera mise en place à côté des systèmes existants, puis les fonctionnalités seront transférées par étapes selon leur niveau de maturité et les résultats observés.
 
-Les données et les flux critiques seront contrôlés pendant la coexistence des systèmes. Chaque vague de migration devra prévoir une validation des données, des tests fonctionnels et de charge, une surveillance renforcée et un plan de retour vers l'ancien système.
+Une couche d'adaptation temporaire sera placée au plus près des bases et APIs nationales. Elle prendra la forme de connecteurs backend dédiés, chargés de lire les anciens formats, de les traduire vers le modèle de données centralisé et, si nécessaire, de transmettre les écritures selon les règles de chaque système.
+
+Le frontend central ne communiquera jamais directement avec ces bases : il passera uniquement par le backend et l'API Gateway.
+
+Cette couche ne doit pas devenir une dépendance permanente : chaque connecteur devra être documenté, observé et retiré après la migration du périmètre concerné.
+
+Les données et les flux critiques seront contrôlés pendant la coexistence des systèmes.
+
+Chaque vague de migration devra prévoir une validation des données, des tests fonctionnels et de charge, une surveillance renforcée et un plan de retour vers l'ancien système.
 
 ### 6.2 Étapes de migration
 
 1. **Préparer la plateforme centrale :** mettre en place l'API Gateway, le frontend et le backend communs, le modèle PostgreSQL, l'authentification, l'observabilité et les contrats d'échange.
+
 2. **Construire les connecteurs temporaires :** placer un adaptateur au plus près de chaque base ou API nationale afin de traduire les données et les échanges sans exposer les systèmes historiques au frontend ou au backend métier central.
+
 3. **Piloter avec la version américaine :** auditer puis réutiliser les composants US compatibles avec la cible. Cette version constitue le premier périmètre candidat en raison de ses indicateurs opérationnels favorables ; sa conservation devra être confirmée par l'audit.
+
 4. **Intégrer les enseignements du frontend canadien :** reprendre les parcours, composants et pratiques UX associés aux retours positifs, après vérification de leur accessibilité et de leur compatibilité avec l'interface centralisée.
+
 5. **Migrer par vagues fonctionnelles et géographiques :** commencer par les consultations, puis les comptes, les offres, les réservations et enfin les traitements plus sensibles comme les paiements et les remboursements.
+
 6. **Stabiliser puis décommissionner :** maintenir une période de surveillance, confirmer la qualité des données et les indicateurs de service, puis retirer progressivement les anciens connecteurs et applications.
 
 ### 6.3 Schémas de coexistence et de migration

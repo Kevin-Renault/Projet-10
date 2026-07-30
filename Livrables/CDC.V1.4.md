@@ -17,7 +17,7 @@ Your Car Your Way centralise plusieurs applications nationales hétérogènes. L
 
 ## Périmètre
 
-Inclut : comptes utilisateurs, recherche et réservation de véhicules, paiement via fournisseur externe, consultation historique, gestion basique des agences et véhicules, API pour intégration agence (lecture minimale). Exclut : administration interne avancée, analytics, migration des bases legacy, aspects infra détaillés.
+Inclut : comptes utilisateurs, recherche et réservation de véhicules, paiement via fournisseur externe, consultation historique, gestion basique des agences et véhicules, API pour intégration agence. Exclut : administration interne avancée, analytics, migration des bases legacy, aspects infra détaillés.
 
 ---
 
@@ -39,11 +39,12 @@ Règles générales : identifiants en UUIDv4, timestamps ISO8601, formats JSON (
 - Réservation
   - Créer une réservation pour une offre disponible (statut initial : pending).
   - Règle de modification : possible si > 48h avant début.
-  - Règle d'annulation : >7 jours → 100% remboursé; <7 jours → 25%; <48h → 0%.
+  - Règle d'annulation : à partir de 7 jours inclus → 100% remboursé; moins de 7 jours → 25%.
 
 - Paiement
   - Initier un paiement via un fournisseur externe (Stripe/PayPal) et recevoir confirmation via webhook.
   - Ne pas stocker les numéros de carte en clair.
+  - Pour un fournisseur retenu, limiter les notifications souscrites aux événements nécessaires au cycle de vie du paiement et du remboursement.
 
 - Historique
   - L'utilisateur peut consulter ses réservations passées et en cours.
@@ -53,7 +54,7 @@ Règles générales : identifiants en UUIDv4, timestamps ISO8601, formats JSON (
   - Exposer la classification ACRISS du véhicule et, pour les vans passagers, respecter le codage complémentaire lié au nombre de places.
 
 - API agences
-  - Fournir des endpoints sécurisés en lecture seule pour consultation par les applications d'agence dans le périmètre de la première livraison.
+  - Fournir des endpoints sécurisés pour les applications d'agence dans le périmètre de la première livraison.
 
 ---
 
@@ -122,6 +123,8 @@ En tant que client, je veux afficher les offres de location à partir de critèr
 
 **Critères d’acceptation** :
 - Étant donné un client, quand il renseigne une ville de départ, une ville de retour, une date et une heure de début, une date et une heure de retour et une catégorie de véhicule ACRISS, alors les offres de location correspondantes sont affichées.
+- Étant donné une recherche valide, quand les offres sont affichées, alors les résultats sont paginés et le nombre d’offres chargées initialement est limité afin de réduire les données transférées.
+- Étant donné une recherche comportant plusieurs pages de résultats, quand le client demande une autre page, alors seuls les résultats de la page demandée sont chargés.
 - Étant donné un client naviguant au clavier, quand il utilise le formulaire de recherche, alors il peut atteindre et renseigner tous les champs sans souris.
 - Étant donné un client utilisant un lecteur d’écran, quand il utilise le formulaire de recherche, alors les champs, leurs libellés et les messages associés sont compréhensibles.
 
@@ -149,6 +152,10 @@ En tant que client disposant d’une réservation, je veux consulter l’histori
 
 **Critères d’acceptation** :
 - Étant donné un client disposant d’un compte, quand il consulte son historique, alors ses réservations passées et en cours sont affichées.
+- Étant donné un client consultant son historique sans filtre personnalisé, quand la page est ouverte, alors les réservations des 30 derniers jours sont affichées par défaut et les résultats sont paginés.
+- Étant donné un client consultant son historique, quand il souhaite retrouver une réservation plus ancienne, alors il peut élargir la période de recherche ou saisir une période personnalisée.
+- Étant donné un client ayant choisi une période ou une page, quand il actualise la page, alors les critères de recherche sont conservés.
+- Étant donné un client ayant modifié les critères de son historique, quand il réinitialise les filtres, alors l’application revient à la période et à la pagination par défaut.
 - Étant donné un client naviguant au clavier ou à l’aide d’un lecteur d’écran, quand il consulte son historique, alors il peut parcourir ses réservations et distinguer les informations utiles sans dépendre d’un code couleur seul.
 
 ---
@@ -164,9 +171,35 @@ En tant que client disposant d’une réservation, je veux modifier ma réservat
 En tant que client disposant d’une réservation, je veux annuler ma réservation afin de renoncer à la location.
 
 **Critères d’acceptation** :
-- Étant donné une réservation, quand le client l’annule **à plus de 7 jours de son début**, alors le remboursement est de **100%**.
+- Étant donné une réservation, quand le client l’annule **à 7 jours ou plus de son début**, alors le remboursement est de **100%**.
 - Étant donné une réservation, quand le client l’annule **à moins de 7 jours de son début**, alors le remboursement est limité à **25%** du montant total.
-- Étant donné une réservation, quand le client l’annule **à moins de 48h de son début**, alors **aucun remboursement** n’est effectué.
+
+#### **Cycle de vie fonctionnel d’une réservation**
+
+Le parcours ci-dessous synthétise les principaux états d’une réservation et les règles associées au paiement, à la modification et à l’annulation. Les statuts de paiement et de remboursement peuvent évoluer indépendamment du statut de la réservation.
+
+```mermaid
+stateDiagram-v2
+  [*] --> pending : réservation créée
+  pending --> confirmed : paiement confirmé
+  pending --> cancelled : paiement échoué ou expiration
+  confirmed --> modified : modification > 48 h avant le début
+  modified --> confirmed : modification enregistrée
+  confirmed --> cancelled : annulation demandée
+  cancelled --> [*]
+  confirmed --> completed : location terminée
+  completed --> [*]
+
+  state cancelled {
+    [*] --> refund_pending : remboursement demandé
+    refund_pending --> refunded_100 : annulation à 7 jours ou plus
+    refund_pending --> refunded_25 : annulation à moins de 7 jours
+    refunded_100 --> [*]
+    refunded_25 --> [*]
+  }
+```
+
+Ce schéma est une vue fonctionnelle simplifiée : une demande de modification à moins de 48 heures est refusée et ne change pas l’état de la réservation.
 
 ---
 ### **3. Intégration avec les applications d’agence**
@@ -199,6 +232,10 @@ En tant qu’utilisateur de l’application, je veux que les échanges avec les 
 - Étant donné un client qui valide un paiement, quand l’application sollicite le fournisseur externe, alors seules les données nécessaires sont transmises et aucune donnée bancaire sensible n’est stockée par l’application.
 - Étant donné un événement reçu d’un fournisseur externe, quand le webhook est transmis à l’API, alors sa signature et son horodatage sont vérifiés avant tout traitement.
 - Étant donné un événement déjà traité, quand le même webhook est reçu plusieurs fois, alors il n’est pas traité une seconde fois et son identifiant est conservé pour assurer l’idempotence.
+- Étant donné un webhook valide, quand l’événement est reçu, alors il est enregistré de manière idempotente avant le traitement métier long et l’API répond par un statut de succès afin de limiter les nouvelles tentatives du fournisseur.
+- Étant donné un webhook invalide ou non authentifiable, quand l’API le reçoit, alors aucune mise à jour métier n’est exécutée et l’événement est journalisé sans exposer de secret.
+- Étant donné un webhook PayPal lorsque PayPal est retenu, quand l’API reçoit une notification, alors elle conserve le corps brut et les éléments nécessaires à la vérification PayPal, notamment l’identifiant du webhook et les informations de transmission, avant toute désérialisation métier.
+- Étant donné un webhook PayPal lorsque le flux Orders v2 / Payments v2 est retenu, alors les événements pris en charge sont explicitement définis parmi les événements d’autorisation, de capture et de remboursement nécessaires au parcours ; les autres événements ne sont pas traités implicitement.
 - Étant donné une erreur ou une indisponibilité du fournisseur externe, quand l’échange échoue, alors l’application conserve un état cohérent, journalise l’erreur et informe l’utilisateur avec un message compréhensible.
 - Étant donné un échange avec un service tiers, quand une clé, un secret ou un jeton est nécessaire, alors cette donnée n’est pas exposée dans le code source, les réponses API ou les journaux applicatifs.
 
@@ -220,6 +257,8 @@ En tant que client, y compris en situation de handicap, je veux que ma session s
 ### **7. Exigences transverses : impact écologique**
 
 - Les échanges réseau doivent limiter les données transférées : réponses paginées, champs nécessaires uniquement et compression adaptée.
+- Les recherches et historiques utilisent une pagination côté serveur et un périmètre initial limité. Les valeurs par défaut sont modifiables par l’utilisateur et ne constituent pas une restriction d’accès aux données.
+- Les requêtes doivent éviter de charger l’intégralité d’un historique ou d’une liste lorsque seule une page de résultats est affichée.
 - Les images de véhicules doivent être redimensionnées et servies dans un format adapté au contexte d’affichage.
 - Les contenus statiques doivent pouvoir être mis en cache afin de limiter les traitements et transferts répétés.
 - L’architecture doit privilégier un hébergement et des services d’infrastructure dont l’impact environnemental est documenté, dans la limite du budget et de la disponibilité régionale.
