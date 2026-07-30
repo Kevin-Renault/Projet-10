@@ -1,16 +1,18 @@
 # PoC tchat - Your Car Your Way
 
-Cette preuve de concept démontre le parcours d'un tchat entre un client et un agent. Elle couvre uniquement la fonctionnalité de tchat et ne constitue pas l'application complète de réservation.
-
 ## Sommaire
 
 - [**Introduction**](#introduction)
+    - [Quick-start (5 minutes)](#quick-start-5-minutes)
     - [Périmètre de la PoC](#périmètre-de-la-poc)
+        - [Sessions et authentification](#sessions-et-authentification)
+        - [Limites de la PoC](#limites-de-la-poc)
     - [Technologies utilisées](#technologies-utilisées)
 
 - [**Installation**](#installation)
     - [Prérequis](#prérequis)
     - [Récupérer le projet](#récupérer-le-projet)
+    - [Initialiser PostgreSQL via Docker Desktop](#initialiser-postgresql-via-docker-desktop)
     - [Démarrer le backend](#démarrer-le-backend)
     - [Démarrer le frontend](#démarrer-le-frontend)
         - [Mode mock](#mode-mock)
@@ -21,7 +23,7 @@ Cette preuve de concept démontre le parcours d'un tchat entre un client et un a
     - [Parcours de validation](#parcours-de-validation)
         - [Parcours client et agent](#parcours-client-et-agent)
         - [Parcours de libération et de reprise](#parcours-de-libération-et-de-reprise)
-        - [Controle des droits](#controle-des-droits)
+        - [Contrôle des droits](#contrôle-des-droits)
 
 - [**API du tchat**](#api-du-tchat)
     - [Contrat OpenAPI](#contrat-openapi)
@@ -34,8 +36,11 @@ Cette preuve de concept démontre le parcours d'un tchat entre un client et un a
     - [Backend](#backend)
 
 - [Structure réelle de la PoC](#structure-réelle-de-la-poc)
+- [Limites avant production](#limites-avant-production)
 
 ## Introduction
+
+Cette preuve de concept démontre le parcours d'un tchat entre un client et un agent. Elle couvre uniquement la fonctionnalité de tchat et ne constitue pas l'application complète de réservation.
 
 ## Quick-start (5 minutes)
 
@@ -47,12 +52,12 @@ git clone https://github.com/Kevin-Renault/Projet-10.git
 Set-Location Projet-10\PoC
 ```
 
-2. Préparer les variables d'environnement pour l'application
+2. Préparer la configuration locale Docker et JWT
 
 ```powershell
 # Copier l'exemple et éditer les secrets locaux (ne PAS committer back/.env)
 copy back\.env.example back\.env
-notepad back\.env    # éditer DB_PASSWORD et JWT_SECRET
+notepad back\.env    # éditer POSTGRES_PASSWORD et JWT_SECRET
 ```
 
 3. Démarrer PostgreSQL et initialiser la base (utilise les valeurs de `back/.env`)
@@ -61,8 +66,8 @@ notepad back\.env    # éditer DB_PASSWORD et JWT_SECRET
 # Recommended: use docker compose to start Postgres and run the SQL init scripts
 docker compose -f docker-compose.yml up -d --build
 
-# Follow Postgres logs (will show initialization progress)
-docker compose -f docker-compose.yml logs -f postgres
+# Consulter les derniers logs PostgreSQL sans bloquer le terminal
+docker compose -f docker-compose.yml logs --tail 100 postgres
 
 # If you need a clean re-init, stop and remove volumes first:
 # docker compose -f docker-compose.yml down -v
@@ -122,13 +127,12 @@ Notes et bonnes pratiques
     ```
 - Pour nettoyer :
     ```powershell
-    docker rm -f postgres18
-    docker volume rm pgdata
+    docker compose -f docker-compose.yml down -v
     ```
 
-### Périmètre de la PoC
+## Périmètre de la PoC
 
-#### Fonctionnel
+### Fonctionnel
 
 Un client peut :
 - se connecter de façon sécurisée en tant que client
@@ -146,7 +150,7 @@ Un agent peut :
 - libérer une conversation attribuée
 - se déconnecter
 
-#### Implémentation technique
+### Implémentation technique
 
 Cette section décrit comment la PoC réalise les fonctions listées ci‑dessus (emplacement du code, choix d'implémentation). Pour la liste des bibliothèques et versions, voir **Technologies utilisées**.
 
@@ -157,7 +161,7 @@ Cette section décrit comment la PoC réalise les fonctions listées ci‑dessus
 - Sécurité & authentification : mécanisme d'authentification et sessions détaillé dans la sous‑section **Sessions et authentification** ci‑dessous.
 - Tests & validation : le front/back contiennent des suites unitaires et E2E (Jest/Cypress côté frontend, JUnit côté backend) — voir la section *Tests et build*.
 
-#### Relation avec le CDC et ses releases
+### Relation avec le CDC et ses releases
 
 Le CDC décrit le produit cible et organise ses fonctionnalités par livraisons : un lot préparatoire regroupe le socle sécurisé (US-14, US-15 et US-16), la Release 1 regroupe le MVP de réservation (US-01 à US-07) et la Release 2 regroupe l'historique, la modification de réservation, l'intégration agence, l'internationalisation et les services tiers (US-08, US-09, US-10, US-11, US-13 et US-17). Un lot technique distinct, déjà démontré par cette PoC, couvre le tchat client-agent (US-18).
 
@@ -165,7 +169,7 @@ Cette PoC ne constitue pas l'implémentation complète de ces releases. Elle val
 
 Les fonctionnalités de réservation, de paiement et d'infrastructure distribuée décrites dans le CDC et l'architecture cible restent hors du périmètre implémenté de cette PoC.
 
-##### Sessions et authentification
+#### Sessions et authentification
 
 - Mécanisme : la PoC utilise un access token JWT pour l'authentification des requêtes et un refresh token opaque pour prolonger la session.
 - Cookies : les deux tokens sont envoyés au client en cookies `HttpOnly` (impossibles à lire depuis JavaScript). Le refresh cookie est limité au chemin `/api/auth`.
@@ -176,13 +180,13 @@ Les fonctionnalités de réservation, de paiement et d'infrastructure distribué
 - Frontend : `AuthService.initSession()` tente de récupérer `/api/auth/me`; si le token d'accès est expiré il appelle `/api/auth/refresh` puis retente `/me`. Un intercepteur (`RefreshOn401Interceptor`) déclenche automatiquement `/api/auth/refresh` sur `401` et réessaie la requête.
 - CSRF : endpoint `/api/auth/csrf` initialise le cookie `XSRF-TOKEN` et le backend expose le token via l'en-tête `X-XSRF-TOKEN` pour les clients.
 
-#### Limites connues
+### Limites de la PoC
 
 La PoC n'implémente pas le parcours de réservation, le paiement ni l'infrastructure distribuée (Redis, RabbitMQ, Kubernetes) ou une supervision de production. En revanche, elle permet de valider les choix technologiques cibles (Java 21, Spring Boot, Angular, PostgreSQL) sur les parcours fonctionnels montrés dans cette PoC.
 
 
 
-### Technologies utilisées
+## Technologies utilisées
 
 | Composant | Technologie |
 | --- | --- |
@@ -234,7 +238,7 @@ PostgreSQL est fourni par le conteneur Docker Compose. Depuis le dossier `PoC`, 
 
 ```powershell
 docker compose -f docker-compose.yml up -d --build
-docker compose -f docker-compose.yml logs -f postgres
+docker compose -f docker-compose.yml logs --tail 100 postgres
 ```
 
 Les scripts SQL sont exécutés automatiquement lors de la création du volume PostgreSQL. Ils ne sont pas relancés par le backend Spring. Pour une réinitialisation complète, arrêter les services et supprimer le volume :
@@ -347,7 +351,7 @@ Lorsqu'une conversation est `assigned`, le champ `assignedAgentId` contient l'id
 3. Vérifier que la conversation revient dans `En attente`.
 4. Cliquer sur `Prendre` pour vérifier qu'elle peut être reprise.
 
-### Controle des droits
+### Contrôle des droits
 
 1. Attribuer une conversation à `agent_01@gmail.com`.
 2. Se connecter avec `agent_02@gmail.com`.
@@ -389,7 +393,7 @@ Les routes d'authentification utilisées par le frontend sont exposées sous `/a
 
 Les requêtes modifiantes utilisent les cookies d'authentification et le header CSRF géré par le frontend. Les cookies ne sont pas lus directement par le code Angular.
 
-### Contrat OpenAPI de la PoC (`openapi-poc.yaml`)
+### Contrat OpenAPI
 
 Le fichier [`openapi-poc.yaml`](openapi-poc.yaml) est le contrat versionné de l'API de la PoC au format OpenAPI 3.0.3. Il décrit les échanges attendus entre le frontend et le backend de la PoC :
 
@@ -529,7 +533,7 @@ PoC/
 
 Les scripts SQL et le script d'application du schéma se trouvent dans [Livrables/Database](../Livrables/Database). Les documents d'architecture du projet sont conservés dans `Livrables/`, mais ils ne décrivent pas des composants installés dans cette PoC.
 
-## Limites connues
+## Limites avant production
 
 Cette PoC est une démonstration fonctionnelle locale. Elle n'utilise pas de migrations versionnées, de gestion de secrets de production, de scalabilité horizontale, de broker de messages ou de supervision complète des flux SSE.
 
