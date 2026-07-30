@@ -17,7 +17,7 @@
   - [1.4 Orientation stratégique](#14-orientation-stratégique)
     - [1.4.1 Audit ciblé des versions existantes](#141-audit-ciblé-des-versions-existantes)
     - [1.4.2 Critères de décision](#142-critères-de-décision)
-2. [Architecture cible](#2-architecture-cible)
+2. [Architecture cible et spécifications techniques](#2-architecture-cible-et-spécifications-techniques)
   - [2.1 Technologies retenues](#21-technologies-retenues)
   - [2.2 Intégrations et services tiers](#22-intégrations-et-services-tiers)
   - [2.3 Principes d'architecture](#23-principes-darchitecture)
@@ -210,6 +210,13 @@ Cette conclusion justifie la conception d'une architecture centralisée reposant
 
 ### 1.4.1 Audit ciblé des versions existantes
 
+Avant de figer l'architecture et de lancer les travaux de migration, un audit ciblé doit être mené sur deux actifs existants :
+
+- **Version américaine :** vérifier si son architecture, son code, ses interfaces, son modèle de données, ses mécanismes de sécurité et son mode de déploiement peuvent être réutilisés pour la plateforme centralisée. Si elle répond aux exigences fonctionnelles, techniques et réglementaires, sa conservation permettrait de réduire le périmètre de migration, les coûts, les risques et les délais. La décision devra toutefois être fondée sur des preuves et non sur la seule modernité de la stack.
+- **Frontend canadien :** analyser les parcours, les composants d'interface, la navigation, la lisibilité, l'accessibilité et les éléments ayant contribué aux retours positifs des utilisateurs. Les enseignements utiles pourront être repris dans l'interface cible, même si le code canadien n'est pas conservé.
+
+Les éléments actuellement disponibles distinguent les deux sujets : la version américaine présente les meilleurs indicateurs opérationnels de l'existant, tandis que le frontend canadien est associé aux retours UX les plus favorables. L'audit devra confirmer ces constats et identifier précisément ce qui peut être conservé, adapté ou écarté.
+
 #### 1.4.2 Critères de décision
 
 La décision de conserver, adapter ou remplacer une version existante sera prise selon les critères suivants :
@@ -227,7 +234,7 @@ La stratégie cible privilégie donc la réutilisation de l'existant lorsqu'elle
 
 
 
-## 2. Architecture cible
+## 2. Architecture cible et spécifications techniques
 
 Cette section décrit l'état final visé après la migration. Les applications historiques, leurs connecteurs et les mécanismes de coexistence sont temporaires : ils sont décrits dans la stratégie de migration et ne constituent pas des dépendances permanentes de la cible.
 
