@@ -163,9 +163,9 @@ Cette section décrit comment la PoC réalise les fonctions listées ci‑dessus
 
 #### Relation avec le CDC et ses releases
 
-Le CDC décrit le produit cible et organise ses fonctionnalités par livraisons : la Release 1 regroupe le MVP de réservation (US-01 à US-07) et la Release 2 regroupe notamment l'historique, la modification de réservation, l'authentification et la gestion de session (US-08, US-09, US-10, US-11, US-13, US-15, US-16 et US-17).
+Le CDC décrit le produit cible et organise ses fonctionnalités par livraisons : un lot préparatoire regroupe le socle sécurisé (US-14, US-15 et US-16), la Release 1 regroupe le MVP de réservation (US-01 à US-07) et la Release 2 regroupe l'historique, la modification de réservation, l'intégration agence, l'internationalisation et les services tiers (US-08, US-09, US-10, US-11, US-13 et US-17). Un lot technique distinct, déjà démontré par cette PoC, couvre le tchat client-agent (US-18).
 
-Cette PoC ne constitue pas l'implémentation complète de ces releases. Elle valide une tranche technique ciblée, centrée sur le tchat, avec l'authentification et la gestion de session nécessaires à son fonctionnement. L'authentification apparaît donc dans la PoC même si US-15 est planifiée en Release 2 dans le CDC : cela signifie que la capacité technique est démontrée en avance, pas que la Release 2 est livrée.
+Cette PoC ne constitue pas l'implémentation complète de ces releases. Elle valide une tranche technique ciblée, centrée sur le tchat, avec l'authentification et la gestion de session nécessaires à son fonctionnement. Le socle sécurisé et le tchat sont donc démontrés techniquement, sans que cela signifie que la Release 1 ou la Release 2 sont entièrement livrées.
 
 Les fonctionnalités de réservation, de paiement et d'infrastructure distribuée décrites dans le CDC et l'architecture cible restent hors du périmètre implémenté de cette PoC.
 

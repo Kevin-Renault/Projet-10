@@ -9,7 +9,7 @@ Ce document fournit la version minimale du cahier des charges requise pour l'év
 
 ---
 
-## Contexte (résumé)
+## Contexte
 
 Your Car Your Way centralise plusieurs applications nationales hétérogènes. L'objectif ici est d'exprimer clairement les besoins métier prioritaires pour la première livraison fonctionnelle, afin que les développements et les tests d'acceptation puissent être alignés sur des exigences stables.
 
@@ -17,7 +17,7 @@ Your Car Your Way centralise plusieurs applications nationales hétérogènes. L
 
 ## Périmètre
 
-Inclut : comptes utilisateurs, recherche et réservation de véhicules, paiement via fournisseur externe, consultation historique, gestion basique des agences et véhicules, API pour intégration agence. Exclut : administration interne avancée, analytics, migration des bases legacy, aspects infra détaillés.
+Inclut : comptes utilisateurs, tchat entre clients et agents, recherche et réservation de véhicules, paiement via fournisseur externe, consultation historique, gestion basique des agences et véhicules, API pour intégration agence. Exclut : administration interne avancée, analytics, migration des bases legacy, aspects infra détaillés.
 
 ---
 
@@ -48,6 +48,12 @@ Règles générales : identifiants en UUIDv4, timestamps ISO8601, formats JSON (
 
 - Historique
   - L'utilisateur peut consulter ses réservations passées et en cours.
+
+- Tchat client-agent
+  - Permettre à un client de créer et consulter une conversation avec le service client.
+  - Permettre à un agent de consulter les conversations en attente, d'en prendre une en charge et de la libérer.
+  - Permettre aux participants autorisés d'envoyer et de consulter les messages d'une conversation.
+  - Notifier les nouveaux messages en temps réel sans exposer les données d'une autre conversation.
 
 - Véhicules & Agences
   - Lire la liste des véhicules disponibles et les détails des agences, notamment leur ville, leur adresse et leurs horaires d'ouverture.
@@ -247,6 +253,7 @@ En tant que client, y compris en situation de handicap, je veux que ma session s
 
 **Critères d’acceptation** :
 - Étant donné un client connecté, quand son **access token** expire, alors un **refresh token** est utilisé automatiquement pour prolonger sa session sans interruption.
+- Étant donné un client ayant une session valide, quand il ouvre l'application, alors sa session est restaurée automatiquement sans qu'il ait à saisir de nouveau ses identifiants.
 - Étant donné un client utilisant un lecteur d’écran, quand sa session est prolongée, alors un message vocalisé l’informe (ex. : *"Votre session a été prolongée automatiquement").
 - Étant donné un client naviguant au clavier, quand sa session est sur le point d’expirer, alors il peut prolonger la session en appuyant sur un bouton accessible (ex. : `Entrée` ou `Espace`).
 - Étant donné un client, quand sa session expire définitivement, alors il est redirigé vers une page de reconnexion avec un message clair (ex. : *"Votre session a expiré. Veuillez vous reconnecter."*).
@@ -254,7 +261,21 @@ En tant que client, y compris en situation de handicap, je veux que ma session s
 
 ---
 
-### **7. Exigences transverses : impact écologique**
+### **7. Tchat client-agent**
+
+#### **US-18 - Échange entre un client et un agent**
+En tant que client, je veux échanger avec un agent dans une conversation sécurisée afin d'obtenir de l'aide pendant mon parcours.
+
+**Critères d’acceptation** :
+- Étant donné un client authentifié, quand il ouvre le tchat, alors il peut créer une conversation ou consulter sa conversation active.
+- Étant donné un client authentifié, quand il envoie un message, alors celui-ci est enregistré avec son auteur et sa date, puis affiché dans la conversation.
+- Étant donné un agent authentifié, quand il consulte les conversations en attente, alors il peut prendre en charge une conversation et répondre au client.
+- Étant donné un agent ayant pris en charge une conversation, quand il la libère, alors elle redevient disponible pour un autre agent et son historique est conservé.
+- Étant donné un participant autorisé, quand un nouveau message est envoyé, alors il reçoit une notification en temps réel et ne peut accéder qu'aux conversations auxquelles il est autorisé.
+- Étant donné un client ou un agent naviguant au clavier ou utilisant un lecteur d’écran, quand il utilise le tchat, alors les messages, champs, actions et notifications sont compréhensibles et accessibles.
+
+---
+### **8. Exigences transverses : impact écologique**
 
 - Les échanges réseau doivent limiter les données transférées : réponses paginées, champs nécessaires uniquement et compression adaptée.
 - Les recherches et historiques utilisent une pagination côté serveur et un périmètre initial limité. Les valeurs par défaut sont modifiables par l’utilisateur et ne constituent pas une restriction d’accès aux données.
@@ -268,6 +289,7 @@ En tant que client, y compris en situation de handicap, je veux que ma session s
 ## Priorisation / Releases
 
 - Lot préparatoire — Socle sécurisé préalable : US-14, US-15, US-16.
+- Lot technique démontré par la PoC — Tchat client-agent : US-18.
 - Release 1 — Périmètre de la première livraison : US-01, US-02, US-03, US-04, US-05, US-06, US-07.
 - Release 2 : US-08, US-09, US-10, US-11, US-13, US-17.
 
