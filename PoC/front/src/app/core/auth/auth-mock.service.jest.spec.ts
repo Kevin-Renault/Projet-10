@@ -15,12 +15,12 @@ describe('AuthMockService (jest)', () => {
         });
 
         const service = TestBed.runInInjectionContext(() => new AuthMockService());
-        await firstValueFrom(service.login('alice', 'Mock-password1'));
+        await firstValueFrom(service.login('client_01', 'Client_01@MDP'));
 
         const isAuth = service.isAuthenticated$();
         expect(isAuth()).toBe(true);
         expect(service.getToken()).toContain('mock-jwt-token');
-        expect(service.getCurrentUser().username).toBe('alice');
+        expect(service.getCurrentUser().username).toBe('client_01');
     });
 
     it('fails login and clears auth state', async () => {
@@ -30,7 +30,7 @@ describe('AuthMockService (jest)', () => {
         });
 
         const service = TestBed.runInInjectionContext(() => new AuthMockService());
-        await expect(firstValueFrom(service.login('alice', 'bad'))).rejects.toBeTruthy();
+        await expect(firstValueFrom(service.login('client_01', 'bad'))).rejects.toBeTruthy();
 
         const isAuth = service.isAuthenticated$();
         expect(isAuth()).toBe(false);
