@@ -11,10 +11,6 @@ Cette preuve de concept démontre le parcours d'un tchat entre un client et un a
 - [**Installation**](#installation)
     - [Prérequis](#prérequis)
     - [Récupérer le projet](#récupérer-le-projet)
-    - [Initialiser PostgreSQL](#initialiser-postgresql)
-        - [Développement local uniquement](#développement-local-uniquement)
-        - [Environnement persistant hors développement local](#environnement-persistant-hors-développement-local)
-        - [Initialisation automatique par Spring](#initialisation-automatique-par-spring)
     - [Démarrer le backend](#démarrer-le-backend)
     - [Démarrer le frontend](#démarrer-le-frontend)
         - [Mode mock](#mode-mock)
@@ -208,7 +204,7 @@ Installer :
 
 - Java 21 — Temurin (Adoptium) : https://adoptium.net/temurin/releases/?version=21
 - Node.js (LTS) et npm : https://nodejs.org/en/download/
-- PostgreSQL 18 (stable) : https://www.postgresql.org/download/
+- Docker Desktop (avec Docker Compose) : https://www.docker.com/products/docker-desktop/
 - Git : https://git-scm.com/downloads
 
 Vérifier les installations :
@@ -217,10 +213,11 @@ Vérifier les installations :
 java -version
 node --version
 npm --version
-psql --version
+docker --version
+docker compose version
 ```
 
-Le backend attend PostgreSQL sur `localhost:5432`. L'utilisateur PostgreSQL doit pouvoir se connecter à la base et, lors de la première installation, créer l'extension `pgcrypto`.
+Docker Desktop doit être démarré avant l'exécution des commandes Docker Compose.
 
 ### Récupérer le projet
 
@@ -231,45 +228,24 @@ Set-Location Projet-10\PoC
 
 Si le dépôt est déjà présent, se placer directement dans le dossier `PoC`.
 
-### Initialiser PostgreSQL
+### Initialiser PostgreSQL via Docker Desktop
 
-Créer une base vide :
-
-```powershell
-createdb -U postgres ycyw_poc
-```
-
-Le backend lit sa configuration dans les variables d'environnement. Elles doivent être définies avant son démarrage, dans le même environnement que celui qui exécute Maven.
-
-#### Développement local uniquement
-
-Pour un test local rapide, définir les variables dans le terminal PowerShell qui lancera le backend :
+PostgreSQL est fourni par le conteneur Docker Compose. Depuis le dossier `PoC`, recopier d'abord `back/.env.example` vers `back/.env`, renseigner les secrets locaux, puis lancer :
 
 ```powershell
-$env:DB_YCYW_NAME = "ycyw_poc"
-$env:DB_USER = "postgres"
-$env:DB_PASSWORD = "mot-de-passe-local"
-$env:JWT_SECRET = "cle-locale-de-developpement-d-au-moins-32-caracteres"
+docker compose -f docker-compose.yml up -d --build
+docker compose -f docker-compose.yml logs -f postgres
 ```
 
-Cette méthode est pratique pour le développement local : les variables restent disponibles uniquement dans ce terminal et les processus lancés depuis celui-ci. Elles disparaissent lorsque le terminal est fermé. Ne pas utiliser de mots de passe ou de secrets réels dans ce fichier ou dans un script versionné.
-
-#### Environnement persistant hors développement local
-
-Pour une installation persistante sur Windows, définir les variables d'environnement au niveau du système ou du compte utilisateur, puis redémarrer le terminal et les services concernés. Par exemple, depuis un terminal PowerShell ouvert avec les droits nécessaires :
+Les scripts SQL sont exécutés automatiquement lors de la création du volume PostgreSQL. Ils ne sont pas relancés par le backend Spring. Pour une réinitialisation complète, arrêter les services et supprimer le volume :
 
 ```powershell
-[Environment]::SetEnvironmentVariable("DB_YCYW_NAME", "ycyw_poc", "Machine")
-[Environment]::SetEnvironmentVariable("DB_USER", "postgres", "Machine")
-[Environment]::SetEnvironmentVariable("DB_PASSWORD", "<mot-de-passe-a-fournir-hors-du-depot>", "Machine")
-[Environment]::SetEnvironmentVariable("JWT_SECRET", "<secret-a-fournir-hors-du-depot>", "Machine")
+docker compose -f docker-compose.yml down -v
 ```
 
-Le niveau `Machine` concerne tous les utilisateurs et peut nécessiter des droits administrateur. Pour limiter la configuration au compte courant, remplacer `Machine` par `User`.
+Le backend lit les variables de connexion et de sécurité dans `back/.env`. Ne pas committer ce fichier ni y placer de secrets réels.
 
-Dans un environnement de production, ne pas stocker les secrets en clair dans les variables système, un script, le dépôt ou la documentation. Utiliser le gestionnaire de secrets fourni par l'infrastructure de déploiement, puis injecter les valeurs au démarrage de l'application.
-
-Ne pas committer ces valeurs. Le backend utilise aussi, si nécessaire, les variables optionnelles suivantes :
+Le backend utilise aussi, si nécessaire, les variables optionnelles suivantes :
 
 | Variable | Valeur par défaut | Utilisation |
 | --- | --- | --- |
@@ -280,40 +256,9 @@ Ne pas committer ces valeurs. Le backend utilise aussi, si nécessaire, les vari
 | `JWT_COOKIE_SECURE` | `false` | Cookie HTTPS ou non |
 | `JWT_COOKIE_SAMESITE` | `Lax` | Politique SameSite |
 
-#### Initialisation locale par Spring (optionnelle)
-
-Par défaut, Spring n'exécute aucun script SQL au démarrage :
-
-```properties
-spring.sql.init.mode=never
-```
-
-Pour demander exceptionnellement à Spring d'exécuter les scripts SQL depuis
-`back/src/main/resources`, remplacer cette valeur par :
-
-```properties
-spring.sql.init.mode=always
-```
-
-Les scripts concernés sont :
-
-```text
-00_extensions_and_settings.sql
-01_acriss_vehicle.sql
-02_types_enums.sql
-03_auth_schema.sql
-04_core_domain.sql
-05_chat.sql
-07_indexes_constraints.sql
-08_reference_data.sql
-09_person_seed.sql
-```
-
-Le script `06_triggers_and_functions.sql` n'est pas exécuté par le séparateur SQL Spring, car il contient des blocs PL/pgSQL. Pour appliquer l'ensemble du schéma, utiliser le script `Livrables/Database/apply_all.ps1`.
-
 ### Démarrer le backend
 
-Depuis `back`, après avoir défini les variables PostgreSQL et JWT :
+Depuis `back`, après avoir démarré le conteneur PostgreSQL :
 
 ```powershell
 Set-Location back
@@ -321,37 +266,6 @@ Set-Location back
 ```
 
 Le backend démarre sur `http://localhost:8080`.
-
-### Profils Spring Boot (docker vs local)
-
-Ce projet fournit deux fichiers de configuration complémentaires pour faciliter l'exécution selon l'environnement :
-
-- `back/src/main/resources/application-docker.properties` : utilisé quand l'application tourne avec Docker Compose. Il connecte la JVM au service Postgres du réseau Docker (hôte `postgres`) et lit les variables `POSTGRES_*` fournies par `back/.env` ou `docker-compose`.
-- `back/src/main/resources/application-local.properties` : utilisé pour le développement local avec PostgreSQL accessible sur `localhost`. Il utilise les variables `DB_YCYW_NAME`, `DB_USER` et `DB_PASSWORD` (ou des valeurs de secours définies dans le fichier).
-
-Comment lancer avec un profil :
-
-- Lancer depuis un shell (profil `local`) :
-
-```powershell
-# profil local (Postgres sur localhost)
-Set-Location back
-.\mvnw.cmd -Dspring-boot.run.profiles=local spring-boot:run
-```
-
-- Lancer avec Docker Compose (profil `docker`) :
-
-```powershell
-# démarrer Postgres via docker-compose
-docker compose -f docker-compose.yml up -d
-
-# lancer le backend en demandant explicitement le profil docker
-Set-Location back
-.\mvnw.cmd -Dspring-boot.run.profiles=docker spring-boot:run
-```
-
-Avec Docker, une autre option est d'exporter `SPRING_PROFILES_ACTIVE=docker` dans la configuration d'environnement du service `back` dans `docker-compose.yml` — cependant, la méthode ci‑dessus (passage de profil par l'option Maven) est non destructive et simple pour tester.
-
 
 ### Démarrer le frontend
 
