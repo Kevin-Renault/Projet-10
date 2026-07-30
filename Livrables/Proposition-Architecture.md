@@ -1024,7 +1024,9 @@ La PoC propose aussi un mode mock Angular pour tester l'interface sans PostgreSQ
 
 ### Limites par rapport à la cible
 
-La PoC ne réalise pas encore les parcours de réservation, de paiement ou de gestion complète des véhicules. Elle n'intègre pas non plus Redis, RabbitMQ, Docker, Kubernetes, une passerelle API de production ou une chaîne d'observabilité complète. Ces éléments relèvent de la cible ou de son déploiement futur, pas de la preuve fonctionnelle actuelle.
+La PoC ne réalise pas encore les parcours de réservation, de paiement ou de gestion complète des véhicules. Elle n'intègre pas non plus Redis, RabbitMQ, Kubernetes, une passerelle API de production ou une chaîne d'observabilité complète. 
+Docker Compose est utilisé localement pour exécuter PostgreSQL et initialiser automatiquement un schéma préconfiguré, correspondant au périmètre fonctionnel démontré par la PoC. Ce choix facilite l'intégration de nouveaux développeurs, notamment juniors, en leur permettant de disposer rapidement d'un environnement de données reproductible et opérationnel. Ils peuvent ainsi se concentrer sur le frontend, le backend ou les deux, sans devoir installer ni configurer manuellement la base de données. Aucun déploiement applicatif Docker complet n'est démontré. 
+Ces éléments relèvent de la cible ou de son déploiement futur, pas de la preuve fonctionnelle actuelle.
 
 ## 6. Stratégie de migration
 
